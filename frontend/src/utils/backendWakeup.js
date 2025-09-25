@@ -107,23 +107,45 @@ class BackendWakeupService {
         attempt++
         
         try {
-          this.notifyStatusUpdate('waking', `Attempt ${attempt}/${maxAttempts}: Connecting to server...`)
+          this.notifyStatusUpdate('waking-up', `Attempt ${attempt}/${maxAttempts}: Connecting to server...`)
           
-          // Try to ping the backend
-          const controller = new AbortController()
-          const timeoutId = setTimeout(() => controller.abort(), 8000) // 8 second timeout per attempt
+          // First try the health endpoint directly (better CORS handling)
+          let wakeupSuccess = false
+          
+          try {
+            const healthController = new AbortController()
+            const healthTimeoutId = setTimeout(() => healthController.abort(), 8000)
 
-          const response = await axios.get(`${BACKEND_BASE_URL}/`, {
-            signal: controller.signal,
-            timeout: 8000
-          })
+            const healthResponse = await axios.get(`${API_BASE_URL}/health`, {
+              signal: healthController.signal,
+              timeout: 8000
+            })
+            
+            clearTimeout(healthTimeoutId)
+            
+            if (healthResponse.status === 200) {
+              wakeupSuccess = true
+            }
+          } catch (healthError) {
+            console.log('Health endpoint not responding, trying root endpoint...')
+            
+            // Fallback to root endpoint
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 8000)
+
+            const response = await axios.get(`${BACKEND_BASE_URL}/`, {
+              signal: controller.signal,
+              timeout: 8000
+            })
+            
+            clearTimeout(timeoutId)
+            
+            if (response.status === 200) {
+              wakeupSuccess = true
+            }
+          }
           
-          clearTimeout(timeoutId)
-          
-          // If we get any response, try the health check
-          const healthCheck = await this.checkBackendStatus()
-          
-          if (healthCheck) {
+          if (wakeupSuccess) {
             this.isAwake = true
             this.isWakingUp = false
             this.notifyStatusUpdate('ready', 'Backend is now ready!')
