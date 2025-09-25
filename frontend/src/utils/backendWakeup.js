@@ -1,6 +1,16 @@
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+// Get the API URL and ensure it has the /api suffix
+const getApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL
+  if (envUrl) {
+    // If env URL doesn't end with /api, add it
+    return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`
+  }
+  return 'http://localhost:5000/api'
+}
+
+const API_BASE_URL = getApiBaseUrl()
 const BACKEND_BASE_URL = API_BASE_URL.replace('/api', '')
 
 class BackendWakeupService {
@@ -11,6 +21,12 @@ class BackendWakeupService {
     this.wakeupCallbacks = []
     this.statusCallbacks = []
     this.wakeupTimeout = 30000 // 30 seconds timeout
+    
+    // Debug logging
+    console.log('🔧 BackendWakeupService initialized:')
+    console.log('  API_BASE_URL:', API_BASE_URL)
+    console.log('  BACKEND_BASE_URL:', BACKEND_BASE_URL)
+    console.log('  VITE_API_URL:', import.meta.env.VITE_API_URL)
   }
 
   // Add callback for wake-up completion
