@@ -70,6 +70,15 @@ app.get('/', (req, res) => {
   });
 });
 
+// Simple wake-up endpoint (no auth needed)
+app.get('/wake-up', (req, res) => {
+  res.json({ 
+    message: 'Backend is awake!',
+    status: 'awake',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Routes
 app.use('/api/health', healthRoutes);
 app.use("/api/auth", authRoutes);

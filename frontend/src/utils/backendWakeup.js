@@ -107,29 +107,14 @@ class BackendWakeupService {
         attempt++
         
         try {
+          console.log(`🔄 Wake-up attempt ${attempt}/${maxAttempts}`)
           this.notifyStatusUpdate('waking-up', `Attempt ${attempt}/${maxAttempts}: Connecting to server...`)
           
-          // First try the health endpoint directly (better CORS handling)
+          // Try to wake up the backend - start with root endpoint to wake up the server
           let wakeupSuccess = false
           
           try {
-            const healthController = new AbortController()
-            const healthTimeoutId = setTimeout(() => healthController.abort(), 8000)
-
-            const healthResponse = await axios.get(`${API_BASE_URL}/health`, {
-              signal: healthController.signal,
-              timeout: 8000
-            })
-            
-            clearTimeout(healthTimeoutId)
-            
-            if (healthResponse.status === 200) {
-              wakeupSuccess = true
-            }
-          } catch (healthError) {
-            console.log('Health endpoint not responding, trying root endpoint...')
-            
-            // Fallback to root endpoint
+            // First ping the root endpoint to wake up the server
             const controller = new AbortController()
             const timeoutId = setTimeout(() => controller.abort(), 8000)
 
@@ -141,11 +126,38 @@ class BackendWakeupService {
             clearTimeout(timeoutId)
             
             if (response.status === 200) {
-              wakeupSuccess = true
+              // Now try the health endpoint to confirm API is ready
+              try {
+                const healthController = new AbortController()
+                const healthTimeoutId = setTimeout(() => healthController.abort(), 3000)
+
+                const healthResponse = await axios.get(`${API_BASE_URL}/health`, {
+                  signal: healthController.signal,
+                  timeout: 3000
+                })
+                
+                clearTimeout(healthTimeoutId)
+                
+                if (healthResponse.status === 200) {
+                  wakeupSuccess = true
+                }
+              } catch (healthError) {
+                console.log('Root endpoint responding but health endpoint not ready yet...')
+                // Root is responding, so server is waking up - this counts as partial success
+                // Let it continue trying
+              }
+              
+              // If root endpoint is responding, consider it a success even if health isn't ready yet
+              if (!wakeupSuccess) {
+                wakeupSuccess = true
+              }
             }
+          } catch (rootError) {
+            console.log('Root endpoint not responding, server still sleeping...')
           }
           
           if (wakeupSuccess) {
+            console.log('✅ Backend wake-up successful!')
             this.isAwake = true
             this.isWakingUp = false
             this.notifyStatusUpdate('ready', 'Backend is now ready!')

@@ -34,7 +34,7 @@ export function SmoothCursor() {
       style={{ 
         translateX: xSpring, 
         translateY: ySpring,
-        transform: "translate(-50%, -50%)"
+        transform: "translate(-25%, -25%)"
       }}
     >
       {/* Enhanced green cursor with multiple layers */}
