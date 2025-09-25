@@ -11,18 +11,22 @@ const LandingPage = () => {
   const [showWakeupLoader, setShowWakeupLoader] = useState(false)
 
   useEffect(() => {
-    // Initialize backend wake-up on landing page entry
+    // Check backend status on landing page entry
     const wakeupService = BackendWakeupServiceSingleton.getInstance()
     
-    // Start waking up the backend in the background
-    wakeupService.wakeupBackend({
-      onStatusChange: (status) => {
-        setBackendStatus(status)
-        if (status === 'waking-up') {
-          setShowWakeupLoader(false) // Don't show loader unless user tries to sign in
+    // Check current status
+    const currentStatus = wakeupService.getStatus()
+    setBackendStatus(currentStatus)
+    
+    // Start gentle background wake-up (no UI loader)
+    if (currentStatus !== 'ready') {
+      wakeupService.wakeupBackend({
+        onStatusChange: (status) => {
+          setBackendStatus(status)
+          // Don't show loader for background wake-up, only update status
         }
-      }
-    })
+      })
+    }
   }, [])
 
   const handleGetStarted = () => {
@@ -31,6 +35,18 @@ const LandingPage = () => {
     } else {
       // Show wake-up loader if backend is not ready
       setShowWakeupLoader(true)
+      
+      // Make sure wake-up process is running
+      const wakeupService = BackendWakeupServiceSingleton.getInstance()
+      wakeupService.wakeupBackend({
+        onStatusChange: (status) => {
+          setBackendStatus(status)
+          if (status === 'ready') {
+            setShowWakeupLoader(false)
+            navigate('/auth')
+          }
+        }
+      })
     }
   }
 
