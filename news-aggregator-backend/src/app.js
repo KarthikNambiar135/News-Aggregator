@@ -27,6 +27,8 @@ app.use(cors({
       process.env.FRONTEND_URL
     ].filter(Boolean); // Remove any undefined values
     
+    console.log('🔍 CORS check for origin:', origin);
+    
     // Remove trailing slashes for comparison
     const normalizedOrigin = origin.replace(/\/$/, '');
     
@@ -36,9 +38,10 @@ app.use(cors({
       return normalizedAllowed === normalizedOrigin;
     });
     
-    // Check if it's a Vercel preview deployment
+    // Check if it's a Vercel preview deployment (more permissive)
     const isVercelPreview = normalizedOrigin.includes('vercel.app') && 
-                           normalizedOrigin.includes('news-aggregator');
+                           (normalizedOrigin.includes('news-aggregator') || 
+                            normalizedOrigin.includes('karthik-nambiars-projects'));
     
     if (isExactMatch || isVercelPreview) {
       console.log('✅ CORS allowed origin:', origin);

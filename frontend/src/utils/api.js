@@ -1,8 +1,21 @@
 import axios from 'axios';
 
+// Get the API URL and ensure it has the /api suffix
+const getApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL
+  if (envUrl) {
+    // If env URL doesn't end with /api, add it
+    return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`
+  }
+  return 'http://localhost:5000/api'
+}
+
+const apiBaseUrl = getApiBaseUrl()
+console.log('🔧 API initialized with baseURL:', apiBaseUrl)
+
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: apiBaseUrl,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
