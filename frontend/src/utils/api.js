@@ -48,6 +48,8 @@ export const authAPI = {
   getUserStats: () => api.get('/auth/stats'),
   getPlatformStats: () => api.get('/auth/platform-stats'),
   getPublicProfile: (username) => api.get(`/auth/user/${username}`),
+  getLeaderboard: (params = {}) => api.get('/auth/leaderboard', { params }),
+  getUserAchievements: () => api.get('/auth/achievements'),
 };
 
 export const articlesAPI = {

@@ -1,6 +1,8 @@
 const Article = require("../models/Article");
 const Annotation = require("../models/Annotation");
 const Vote = require("../models/Vote");
+const User = require("../models/User");
+const { checkAchievements } = require("../utils/achievements");
 
 // 🔹 Unified vote function
 exports.vote = async (req, res) => {
@@ -40,10 +42,27 @@ exports.vote = async (req, res) => {
       await target.save();
       await new Vote({ userId: req.user.id, targetId: id, targetType, type }).save();
 
+      // Award points for voting (small amount)
+      const pointsEarned = 2;
+      await User.findByIdAndUpdate(req.user.id, {
+        $inc: { 
+          reputation: pointsEarned,
+          totalPoints: pointsEarned,
+          totalVotes: 1
+        },
+        lastActiveAt: new Date()
+      });
+
+      // Check for achievements
+      const achievementResult = await checkAchievements(req.user.id);
+
       return res.status(200).json({
         message: "Vote added",
         target,
-        userVote: type
+        userVote: type,
+        pointsEarned,
+        newAchievements: achievementResult.achievements,
+        levelUp: achievementResult.levelUp
       });
     }
 

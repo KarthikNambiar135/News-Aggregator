@@ -58,6 +58,10 @@ const articleSchema = new mongoose.Schema(
     imageUrl: { type: String },
     thumbnailUrl: { type: String },
     
+    // Points and rewards
+    pointsEarned: { type: Number, default: 50 }, // Points earned by submitter
+    qualityScore: { type: Number, default: 0, min: 0, max: 100 }, // Overall quality assessment
+    
     // Flags
     isTrending: { type: Boolean, default: false },
     isFeatured: { type: Boolean, default: false },

@@ -13,6 +13,7 @@ const userSchema = new mongoose.Schema(
       default: "user",
     },
     reputation: { type: Number, default: 0 },
+    totalPoints: { type: Number, default: 0 }, // Total points earned across all activities
     articlesVerified: { type: Number, default: 0 },
     articlesSubmitted: { type: Number, default: 0 },
     accuracyRate: { type: Number, default: 0 }, // Percentage
@@ -44,5 +45,27 @@ userSchema.pre("save", async function (next) {
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
+
+// Method to calculate user level based on reputation
+userSchema.methods.calculateLevel = function() {
+  const reputation = this.reputation || 0;
+  
+  if (reputation >= 1000) return 'Master';
+  else if (reputation >= 500) return 'Expert';
+  else if (reputation >= 100) return 'Advanced';
+  else return 'Novice';
+};
+
+// Pre-save hook to update level
+userSchema.pre('save', function(next) {
+  const oldLevel = this.level;
+  this.level = this.calculateLevel();
+  
+  // Store if level changed for middleware access
+  this._levelChanged = oldLevel !== this.level;
+  this._oldLevel = oldLevel;
+  
+  next();
+});
 
 module.exports = mongoose.model("User", userSchema);

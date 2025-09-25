@@ -2,6 +2,7 @@ const FactCheck = require('../models/FactCheck');
 const Article = require('../models/Article');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
+const { checkAchievements } = require('../utils/achievements');
 
 // 🔹 Submit fact-check
 exports.submitFactCheck = async (req, res) => {
@@ -52,9 +53,16 @@ exports.submitFactCheck = async (req, res) => {
       }
     });
 
+    // Calculate points for fact-checking
+    const pointsEarned = 25; // Base points for fact-checking
+    
     // Update user stats
     await User.findByIdAndUpdate(req.user._id, {
-      $inc: { articlesVerified: 1 },
+      $inc: { 
+        articlesVerified: 1,
+        reputation: pointsEarned,
+        totalPoints: pointsEarned
+      },
       lastActiveAt: new Date()
     });
 
@@ -79,13 +87,19 @@ exports.submitFactCheck = async (req, res) => {
       });
     }
 
+    // Check for achievements
+    const achievementResult = await checkAchievements(req.user._id);
+
     // Populate response
     const populatedFactCheck = await FactCheck.findById(factCheck._id)
       .populate('reviewer', 'name username role reputation badges level');
 
     res.status(201).json({
       message: 'Fact-check submitted successfully',
-      factCheck: populatedFactCheck
+      factCheck: populatedFactCheck,
+      pointsEarned,
+      newAchievements: achievementResult.achievements,
+      levelUp: achievementResult.levelUp
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

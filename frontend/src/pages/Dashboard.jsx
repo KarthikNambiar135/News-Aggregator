@@ -4,13 +4,16 @@ import { useAuth } from '../contexts/AuthContext'
 import { ArticleCard, FactCheckModal, ArticleSubmissionForm } from '../components/ArticleComponents'
 import SourceReliabilityDashboard from '../components/SourceReliabilityDashboard'
 import RealTimeNotifications from '../components/RealTimeNotifications'
+import AchievementsModal from '../components/AchievementsModal'
+import ToastNotification from '../components/ToastNotification'
 import CommunityPage from './CommunityPage'
 import SourcesPage from './SourcesPage'
+import Analytics from './Analytics'
 import { articlesAPI, notificationsAPI, authAPI } from '../utils/api'
 import { 
   Globe, Search, Bell, User, Menu, X, Plus, Home, TrendingUp, 
   Shield, Users, BookOpen, Settings, LogOut, Filter,
-  CheckCircle, AlertTriangle, Clock, BarChart3, Calendar
+  CheckCircle, AlertTriangle, Clock, BarChart3, Calendar, Trophy
 } from 'lucide-react'
 
 // Real data state
@@ -50,6 +53,8 @@ const Dashboard = () => {
   const [submitModalOpen, setSubmitModalOpen] = useState(false)
   const [sourceReliabilityOpen, setSourceReliabilityOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [achievementsOpen, setAchievementsOpen] = useState(false)
+  const [toast, setToast] = useState(null)
   const [dateRange, setDateRange] = useState('all')
   const [credibilityRange, setCredibilityRange] = useState([0, 100])
   const [sourceReliability, setSourceReliability] = useState('all')
@@ -107,7 +112,8 @@ const Dashboard = () => {
     { id: 'social', name: 'Social', icon: <Users className="w-5 h-5" />, path: '/dashboard', isCategory: true },
     { id: 'science', name: 'Science', icon: <BookOpen className="w-5 h-5" />, path: '/dashboard', isCategory: true },
     { id: 'sources', name: 'Source Reliability', icon: <BarChart3 className="w-5 h-5" />, path: '/dashboard/sources' },
-    { id: 'community', name: 'Community', icon: <Users className="w-5 h-5" />, path: '/dashboard/community' }
+    { id: 'community', name: 'Community', icon: <Users className="w-5 h-5" />, path: '/dashboard/community' },
+    { id: 'analytics', name: 'Analytics', icon: <TrendingUp className="w-5 h-5" />, path: '/dashboard/analytics' }
   ]
 
   const handleLogout = () => {
@@ -151,7 +157,10 @@ const Dashboard = () => {
             </div>
             <div>
               <div className="font-semibold text-gray-900">{user?.username}</div>
-              <div className="text-sm text-gray-600">Reputation: {user?.reputation}</div>
+              <div className="text-sm text-gray-600">
+                <span className="font-medium text-green-600">{user?.reputation || 0} pts</span> • 
+                Level: {user?.level || 'Novice'}
+              </div>
             </div>
           </div>
           <div className="mt-4 flex justify-between text-sm">
@@ -167,6 +176,17 @@ const Dashboard = () => {
               <div className="font-medium text-gray-900">{userStats.disputedArticles || 0}</div>
               <div className="text-gray-600">Disputed</div>
             </div>
+          </div>
+          
+          {/* Achievements Button */}
+          <div className="mt-4">
+            <button
+              onClick={() => setAchievementsOpen(true)}
+              className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-lg hover:from-yellow-500 hover:to-orange-600 transition-all font-medium flex items-center justify-center space-x-2"
+            >
+              <Trophy className="w-4 h-4" />
+              <span>View Achievements</span>
+            </button>
           </div>
         </div>
 
@@ -332,6 +352,7 @@ const Dashboard = () => {
           <Routes>
             <Route path="/community" element={<CommunityPage />} />
             <Route path="/sources" element={<SourcesPage />} />
+            <Route path="/analytics" element={<Analytics />} />
             <Route path="/" element={
               <div className="p-6">
                 <DashboardHome 
@@ -363,9 +384,44 @@ const Dashboard = () => {
       <ArticleSubmissionForm
         isOpen={submitModalOpen}
         onClose={() => setSubmitModalOpen(false)}
-        onSubmit={(data) => {
-          console.log('Submitted article:', data)
-          setSubmitModalOpen(false)
+        onSubmit={async (data) => {
+          try {
+            console.log('Submitting article:', data)
+            const response = await articlesAPI.submitArticle(data)
+            
+            // Refresh articles and user stats after successful submission
+            loadArticles()
+            loadUserStats()
+            
+            setSubmitModalOpen(false)
+            
+            // Show success notification with points and achievements
+            const pointsEarned = response.data.pointsEarned || 50
+            const newAchievements = response.data.newAchievements || []
+            const levelUp = response.data.levelUp
+            
+            if (levelUp) {
+              setToast({
+                message: `🎉 Level Up! You've reached ${levelUp.to} level! +${pointsEarned} points earned!`,
+                type: 'achievement',
+                achievements: newAchievements
+              })
+            } else if (newAchievements.length > 0) {
+              setToast({
+                message: `Article submitted! +${pointsEarned} points earned!`,
+                type: 'achievement',
+                achievements: newAchievements
+              })
+            } else {
+              setToast({
+                message: `Article submitted successfully! +${pointsEarned} points earned!`,
+                type: 'points'
+              })
+            }
+          } catch (error) {
+            console.error('Failed to submit article:', error)
+            alert('Failed to submit article. Please try again.')
+          }
         }}
       />
 
@@ -378,6 +434,21 @@ const Dashboard = () => {
         isOpen={notificationsOpen}
         onClose={() => setNotificationsOpen(false)}
       />
+
+      <AchievementsModal
+        isOpen={achievementsOpen}
+        onClose={() => setAchievementsOpen(false)}
+      />
+
+      {/* Toast Notifications */}
+      {toast && (
+        <ToastNotification
+          message={toast.message}
+          type={toast.type}
+          achievements={toast.achievements}
+          onClose={() => setToast(null)}
+        />
+      )}
 
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (

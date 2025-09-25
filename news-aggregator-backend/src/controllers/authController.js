@@ -263,6 +263,46 @@ exports.getPublicProfile = async (req, res, next) => {
   }
 };
 
+// Get user achievements
+exports.getUserAchievements = async (req, res) => {
+  try {
+    const { getUserAchievementProgress } = require('../utils/achievements');
+    const progress = await getUserAchievementProgress(req.user._id);
+    
+    res.json(progress);
+  } catch (error) {
+    console.error('Achievements error:', error);
+    res.status(500).json({ message: 'Failed to fetch achievements' });
+  }
+};
+
+// Get leaderboard
+exports.getLeaderboard = async (req, res) => {
+  try {
+    const { limit = 10, sortBy = 'reputation' } = req.query;
+    
+    const sortField = {};
+    sortField[sortBy] = -1;
+    
+    const users = await User.find({ isActive: true })
+      .select('username reputation totalPoints articlesSubmitted articlesVerified level badges')
+      .sort(sortField)
+      .limit(parseInt(limit))
+      .lean();
+    
+    // Add ranking
+    const leaderboard = users.map((user, index) => ({
+      ...user,
+      rank: index + 1
+    }));
+    
+    res.json(leaderboard);
+  } catch (error) {
+    console.error('Leaderboard error:', error);
+    res.status(500).json({ message: 'Failed to fetch leaderboard' });
+  }
+};
+
 // Admin-only example
 exports.adminOnly = async (req, res, next) => {
   try {

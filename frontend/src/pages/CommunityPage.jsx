@@ -1,13 +1,34 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { 
   User, Star, Award, TrendingUp, MessageSquare, Shield, 
   Calendar, CheckCircle, AlertTriangle, Clock, Trophy,
   Users, BookOpen, Search, Filter
 } from 'lucide-react'
+import { authAPI } from '../utils/api'
 
 const CommunityPage = () => {
   const [activeTab, setActiveTab] = useState('leaderboard')
   const [searchQuery, setSearchQuery] = useState('')
+  const [leaderboard, setLeaderboard] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadLeaderboard = async () => {
+      try {
+        setLoading(true)
+        const response = await authAPI.getLeaderboard({ limit: 20, sortBy: 'reputation' })
+        setLeaderboard(response.data)
+      } catch (error) {
+        console.error('Failed to load leaderboard:', error)
+        // Fallback to mock data
+        setLeaderboard(topFactCheckers)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadLeaderboard()
+  }, [])
 
   const topFactCheckers = [
     {
@@ -221,7 +242,12 @@ const CommunityPage = () => {
                 </div>
 
                 <div className="space-y-4">
-                  {topFactCheckers.map((factChecker, index) => (
+                  {loading ? (
+                    <div className="flex justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-dark-green"></div>
+                    </div>
+                  ) : (
+                    (leaderboard.length > 0 ? leaderboard : topFactCheckers).map((factChecker, index) => (
                     <div key={factChecker.id} className="bg-gray-50 rounded-xl p-6 hover:bg-gray-100 transition-colors">
                       <div className="flex items-center space-x-4">
                         {/* Rank */}
@@ -252,17 +278,17 @@ const CommunityPage = () => {
                             </div>
                             <div className="flex items-center space-x-1">
                               <CheckCircle className="w-4 h-4" />
-                              <span>{factChecker.verificationsCount} verifications</span>
+                              <span>{factChecker.articlesVerified || factChecker.verificationsCount || 0} verifications</span>
                             </div>
                             <div className="flex items-center space-x-1">
                               <TrendingUp className="w-4 h-4" />
-                              <span>{factChecker.accuracy}% accuracy</span>
+                              <span>{factChecker.articlesSubmitted || 0} submissions</span>
                             </div>
                           </div>
 
                           <div className="flex items-center justify-between">
                             <div className="flex flex-wrap gap-2">
-                              {factChecker.badges.map((badge) => (
+                              {(factChecker.badges || []).map((badge) => (
                                 <span key={badge} className={`px-2 py-1 rounded-full text-xs font-medium ${getBadgeColor(badge)}`}>
                                   {badge}
                                 </span>
@@ -270,13 +296,14 @@ const CommunityPage = () => {
                             </div>
                             
                             <div className="text-sm text-gray-500">
-                              Specialties: {factChecker.specialties.join(', ')}
+                              Specialties: {factChecker.specialties?.join(', ') || 'General'}
                             </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  ))}
+                  )))
+                }
                 </div>
               </div>
             )}

@@ -4,6 +4,7 @@ const Source = require('../models/Source');
 const FactCheck = require('../models/FactCheck');
 const Notification = require('../models/Notification');
 const { parseUrlContent } = require('../utils/parser');
+const { checkAchievements } = require('../utils/achievements');
 
 // 🔹 Submit new article
 exports.submitArticle = async (req, res) => {
@@ -37,6 +38,9 @@ exports.submitArticle = async (req, res) => {
     // Get user info for denormalization
     const user = await User.findById(req.user._id);
 
+    // Calculate points earned based on submission quality
+    const pointsEarned = 50; // Base points for article submission
+    
     const article = await Article.create({
       url,
       title: title || parsed.title || 'Untitled',
@@ -52,12 +56,17 @@ exports.submitArticle = async (req, res) => {
       author: parsed.author,
       publishedAt: parsed.publishedAt,
       imageUrl: parsed.image,
-      thumbnailUrl: parsed.image
+      thumbnailUrl: parsed.image,
+      pointsEarned
     });
 
-    // Update user stats
+    // Update user stats and reputation
     await User.findByIdAndUpdate(req.user._id, {
-      $inc: { articlesSubmitted: 1 },
+      $inc: { 
+        articlesSubmitted: 1,
+        reputation: pointsEarned,
+        totalPoints: pointsEarned
+      },
       lastActiveAt: new Date()
     });
 
@@ -68,13 +77,19 @@ exports.submitArticle = async (req, res) => {
       });
     }
 
+    // Check for achievements
+    const achievementResult = await checkAchievements(req.user._id);
+
     // Populate the response
     const populatedArticle = await Article.findById(article._id)
       .populate('submittedBy', 'name username role reputation badges');
 
     res.status(201).json({
       message: 'Article submitted successfully',
-      article: populatedArticle
+      article: populatedArticle,
+      pointsEarned,
+      newAchievements: achievementResult.achievements,
+      levelUp: achievementResult.levelUp
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
