@@ -26,6 +26,7 @@ function AppContent() {
   return (
     <Router>
       <div className="min-h-screen bg-[#eceae1]">
+        <SmoothCursor />
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/auth" element={<AuthPage />} />

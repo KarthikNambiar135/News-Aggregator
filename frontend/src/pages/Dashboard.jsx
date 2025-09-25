@@ -6,6 +6,7 @@ import SourceReliabilityDashboard from '../components/SourceReliabilityDashboard
 import RealTimeNotifications from '../components/RealTimeNotifications'
 import AchievementsModal from '../components/AchievementsModal'
 import ToastNotification from '../components/ToastNotification'
+import SmoothCursor from '../components/SmoothCursor'
 import CommunityPage from './CommunityPage'
 import SourcesPage from './SourcesPage'
 import Analytics from './Analytics'
@@ -132,6 +133,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
+      <SmoothCursor />
       {/* Sidebar */}
       <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform lg:translate-x-0 lg:static lg:inset-0`}>
         <div className="flex items-center justify-between p-6 border-b">

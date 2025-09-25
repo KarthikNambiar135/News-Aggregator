@@ -1,8 +1,38 @@
 import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { Shield, Users, CheckCircle, Search, TrendingUp, Globe, ArrowRight, Zap } from 'lucide-react'
+import BackendWakeupServiceSingleton from '../utils/backendWakeup'
+import BackendWakeupLoader from '../components/BackendWakeupLoader'
+import SmoothCursor from '../components/SmoothCursor'
 
 const LandingPage = () => {
   const navigate = useNavigate()
+  const [backendStatus, setBackendStatus] = useState('checking')
+  const [showWakeupLoader, setShowWakeupLoader] = useState(false)
+
+  useEffect(() => {
+    // Initialize backend wake-up on landing page entry
+    const wakeupService = BackendWakeupServiceSingleton.getInstance()
+    
+    // Start waking up the backend in the background
+    wakeupService.wakeupBackend({
+      onStatusChange: (status) => {
+        setBackendStatus(status)
+        if (status === 'waking-up') {
+          setShowWakeupLoader(false) // Don't show loader unless user tries to sign in
+        }
+      }
+    })
+  }, [])
+
+  const handleGetStarted = () => {
+    if (backendStatus === 'ready') {
+      navigate('/auth')
+    } else {
+      // Show wake-up loader if backend is not ready
+      setShowWakeupLoader(true)
+    }
+  }
 
   const features = [
     {
@@ -40,6 +70,18 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#eceae1' }}>
+      <SmoothCursor />
+      
+      {/* Backend Wake-up Loader */}
+      {showWakeupLoader && (
+        <BackendWakeupLoader
+          onClose={() => setShowWakeupLoader(false)}
+          onSuccess={() => {
+            setShowWakeupLoader(false)
+            navigate('/auth')
+          }}
+        />
+      )}
       {/* Navigation */}
       <nav className="relative z-20 px-6 py-4 bg-white/90 backdrop-blur-md border-b border-gray-200">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -56,12 +98,12 @@ const LandingPage = () => {
             <a href="#community" className="text-gray-700 hover:text-dark-green transition-colors">Community</a>
           </div>
           
-          <Link
-            to="/auth"
+          <button
+            onClick={handleGetStarted}
             className="bg-dark-green text-white px-6 py-3 rounded-lg hover-lift smooth-transition font-medium button-press glow-effect"
           >
             Get Started
-          </Link>
+          </button>
         </div>
       </nav>
 
@@ -87,7 +129,7 @@ const LandingPage = () => {
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12 animate-fade-in-up opacity-0" style={{ animationDelay: '0.6s', animationFillMode: 'forwards' }}>
               <button
-                onClick={() => navigate('/auth')}
+                onClick={handleGetStarted}
                 className="bg-dark-green text-white px-8 py-4 rounded-xl hover-lift smooth-transition font-semibold text-lg flex items-center group button-press glow-effect"
               >
                 Start Fact-Checking
@@ -211,7 +253,7 @@ const LandingPage = () => {
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-slide-up opacity-0" style={{ animationDelay: '0.3s', animationFillMode: 'forwards' }}>
             <button
-              onClick={() => navigate('/auth')}
+              onClick={handleGetStarted}
               className="bg-dark-green text-white px-8 py-4 rounded-xl hover-lift smooth-transition font-semibold text-lg flex items-center group button-press pulse-glow"
             >
               Start Fact-Checking Now

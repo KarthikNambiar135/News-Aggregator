@@ -9,6 +9,7 @@ const communityRoutes = require('./routes/communityRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const voteRoutes = require("./routes/voteRoutes");
 const annotationRoutes = require("./routes/annotationRoutes");
+const healthRoutes = require("./routes/healthRoutes");
 const { errorHandler } = require("./middlewares/errorMiddleware");
 
 const app = express();
@@ -21,16 +22,18 @@ app.use(cors({
 app.use(express.json());
 app.use(morgan("dev"));
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
+// Root route for wake-up pings
+app.get('/', (req, res) => {
   res.json({ 
-    status: 'OK', 
+    message: 'News Aggregator Backend is running!',
+    status: 'OK',
     timestamp: new Date().toISOString(),
     version: '1.0.0'
   });
 });
 
 // Routes
+app.use('/api/health', healthRoutes);
 app.use("/api/auth", authRoutes);
 app.use('/api/articles', articleRoutes);
 app.use('/api/factchecks', factCheckRoutes);

@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Globe, Mail, Lock, User, ArrowLeft } from 'lucide-react'
+import BackendWakeupServiceSingleton from '../utils/backendWakeup'
+import BackendWakeupLoader from '../components/BackendWakeupLoader'
+import SmoothCursor from '../components/SmoothCursor'
 
 const AuthPage = () => {
   const [isLogin, setIsLogin] = useState(true)
@@ -13,6 +16,8 @@ const AuthPage = () => {
   })
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
+  const [backendStatus, setBackendStatus] = useState('checking')
+  const [showWakeupLoader, setShowWakeupLoader] = useState(false)
   
   const { login, register, isAuthenticated } = useAuth()
   const navigate = useNavigate()
@@ -23,6 +28,30 @@ const AuthPage = () => {
       navigate('/dashboard')
     }
   }, [isAuthenticated, navigate])
+
+  // Check backend status on component mount
+  useEffect(() => {
+    const wakeupService = BackendWakeupServiceSingleton.getInstance()
+    
+    // Check current status
+    const currentStatus = wakeupService.getStatus()
+    setBackendStatus(currentStatus)
+    
+    // If backend is not ready, show the loader
+    if (currentStatus !== 'ready') {
+      setShowWakeupLoader(true)
+      
+      // Start wake-up process if needed
+      wakeupService.wakeupBackend({
+        onStatusChange: (status) => {
+          setBackendStatus(status)
+          if (status === 'ready') {
+            setShowWakeupLoader(false)
+          }
+        }
+      })
+    }
+  }, [])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -106,6 +135,15 @@ const AuthPage = () => {
 
   return (
     <div className="min-h-screen bg-primary flex items-center justify-center px-6 overflow-hidden">
+      <SmoothCursor />
+      
+      {/* Backend Wake-up Loader */}
+      {showWakeupLoader && (
+        <BackendWakeupLoader
+          onClose={() => setShowWakeupLoader(false)}
+          onSuccess={() => setShowWakeupLoader(false)}
+        />
+      )}
       {/* Background decorations */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-secondary opacity-10 rounded-full blur-3xl animate-pulse"></div>
       <div className="absolute bottom-0 left-0 w-64 h-64 bg-accent opacity-10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>

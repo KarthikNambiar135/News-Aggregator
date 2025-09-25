@@ -214,5 +214,21 @@ body {
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: #024730;
   }
+
+  /* Hide default cursor on desktop when smooth cursor is active */
+  @media (min-width: 768px) {
+    body {
+      cursor: none;
+    }
+    
+    /* Show cursor on interactive elements for accessibility */
+    button, a, input, textarea, select {
+      cursor: pointer;
+    }
+    
+    input, textarea {
+      cursor: text;
+    }
+  }
 }
 
