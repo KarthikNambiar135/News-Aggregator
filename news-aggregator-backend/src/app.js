@@ -24,22 +24,32 @@ app.use(cors({
       'http://localhost:5173',
       'http://localhost:3000',
       'https://news-aggregator-gules.vercel.app',
-      'https://news-aggregator-gules.vercel.app/',
       process.env.FRONTEND_URL
     ].filter(Boolean); // Remove any undefined values
     
+    console.log('🔍 CORS check for origin:', origin);
+    
     // Remove trailing slashes for comparison
     const normalizedOrigin = origin.replace(/\/$/, '');
-    const isAllowed = allowedOrigins.some(allowedOrigin => {
+    
+    // Check exact matches first
+    const isExactMatch = allowedOrigins.some(allowedOrigin => {
       const normalizedAllowed = allowedOrigin.replace(/\/$/, '');
       return normalizedAllowed === normalizedOrigin;
     });
     
-    if (isAllowed) {
+    // Check if it's a Vercel preview deployment (more permissive)
+    const isVercelPreview = normalizedOrigin.includes('vercel.app') && 
+                           (normalizedOrigin.includes('news-aggregator') || 
+                            normalizedOrigin.includes('karthik-nambiars-projects'));
+    
+    if (isExactMatch || isVercelPreview) {
+      console.log('✅ CORS allowed origin:', origin);
       callback(null, true);
     } else {
-      console.log('CORS blocked origin:', origin);
+      console.log('❌ CORS blocked origin:', origin);
       console.log('Allowed origins:', allowedOrigins);
+      console.log('Is Vercel preview?', isVercelPreview);
       callback(new Error('Not allowed by CORS'));
     }
   },
