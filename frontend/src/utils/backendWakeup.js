@@ -1,6 +1,16 @@
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+// Get the API URL and ensure it has the /api suffix
+const getApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL
+  if (envUrl) {
+    // If env URL doesn't end with /api, add it
+    return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`
+  }
+  return 'http://localhost:5000/api'
+}
+
+const API_BASE_URL = getApiBaseUrl()
 const BACKEND_BASE_URL = API_BASE_URL.replace('/api', '')
 
 class BackendWakeupService {
@@ -11,6 +21,12 @@ class BackendWakeupService {
     this.wakeupCallbacks = []
     this.statusCallbacks = []
     this.wakeupTimeout = 30000 // 30 seconds timeout
+    
+    // Debug logging
+    console.log('🔧 BackendWakeupService initialized:')
+    console.log('  API_BASE_URL:', API_BASE_URL)
+    console.log('  BACKEND_BASE_URL:', BACKEND_BASE_URL)
+    console.log('  VITE_API_URL:', import.meta.env.VITE_API_URL)
   }
 
   // Add callback for wake-up completion
@@ -52,7 +68,11 @@ class BackendWakeupService {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
 
-      const response = await axios.get(`${API_BASE_URL}/health`, {
+      // Ensure we're calling the correct health endpoint
+      const healthUrl = `${API_BASE_URL}/health`
+      console.log('🏥 Checking health at:', healthUrl)
+
+      const response = await axios.get(healthUrl, {
         signal: controller.signal,
         timeout: 5000
       })
@@ -131,7 +151,10 @@ class BackendWakeupService {
                 const healthController = new AbortController()
                 const healthTimeoutId = setTimeout(() => healthController.abort(), 3000)
 
-                const healthResponse = await axios.get(`${API_BASE_URL}/health`, {
+                const healthUrl = `${API_BASE_URL}/health`
+                console.log('🏥 Checking health during wakeup at:', healthUrl)
+
+                const healthResponse = await axios.get(healthUrl, {
                   signal: healthController.signal,
                   timeout: 3000
                 })
