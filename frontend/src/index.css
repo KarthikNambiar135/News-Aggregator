@@ -215,15 +215,20 @@ body {
     background: #024730;
   }
 
-  /* Hide default cursor on desktop when smooth cursor is active */
+  /* Keep default cursor visible - smooth cursor will complement it */
   @media (min-width: 768px) {
     body {
-      cursor: none;
+      cursor: auto;
     }
     
-    /* Show cursor on interactive elements for accessibility */
-    button, a, input, textarea, select {
+    /* Enhanced cursor styles for interactive elements */
+    button, a {
       cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+    
+    button:hover, a:hover {
+      transform: scale(1.02);
     }
     
     input, textarea {

@@ -105,6 +105,8 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setIsAuthenticated(false);
     toast.success('You have been logged out successfully.');
+    // Navigate to landing page after logout
+    window.location.href = '/';
   };
 
   const updateUser = async (updates) => {

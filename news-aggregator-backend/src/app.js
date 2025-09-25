@@ -16,11 +16,49 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'https://news-aggregator-gules.vercel.app',
+      'https://news-aggregator-gules.vercel.app/',
+      process.env.FRONTEND_URL
+    ].filter(Boolean); // Remove any undefined values
+    
+    // Remove trailing slashes for comparison
+    const normalizedOrigin = origin.replace(/\/$/, '');
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      const normalizedAllowed = allowedOrigin.replace(/\/$/, '');
+      return normalizedAllowed === normalizedOrigin;
+    });
+    
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      console.log('Allowed origins:', allowedOrigins);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 app.use(express.json());
 app.use(morgan("dev"));
+
+// Additional CORS headers for preflight requests
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
 
 // Root route for wake-up pings
 app.get('/', (req, res) => {
