@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import { notificationsAPI } from '../utils/api'
 
-const RealTimeNotifications = ({ isOpen, onClose }) => {
+const RealTimeNotifications = ({ isOpen, onClose, onNotificationUpdate }) => {
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -48,6 +48,10 @@ const RealTimeNotifications = ({ isOpen, onClose }) => {
       
       setNotifications(formattedNotifications)
       setError(null)
+      
+      // Update unread count in parent component
+      const unreadCount = formattedNotifications.filter(n => !n.read).length
+      onNotificationUpdate?.(unreadCount)
     } catch (err) {
       console.error('Failed to load notifications:', err)
       setError('Failed to load notifications')
@@ -103,11 +107,15 @@ const RealTimeNotifications = ({ isOpen, onClose }) => {
   const markAsRead = async (id) => {
     try {
       await notificationsAPI.markNotificationAsRead(id)
-      setNotifications(prev => 
-        prev.map(notif => 
+      setNotifications(prev => {
+        const updated = prev.map(notif => 
           notif.id === id ? { ...notif, read: true } : notif
         )
-      )
+        // Update unread count in parent
+        const unreadCount = updated.filter(n => !n.read).length
+        onNotificationUpdate?.(unreadCount)
+        return updated
+      })
     } catch (err) {
       console.error('Failed to mark notification as read:', err)
     }
@@ -116,9 +124,12 @@ const RealTimeNotifications = ({ isOpen, onClose }) => {
   const markAllAsRead = async () => {
     try {
       await notificationsAPI.markAllNotificationsAsRead()
-      setNotifications(prev => 
-        prev.map(notif => ({ ...notif, read: true }))
-      )
+      setNotifications(prev => {
+        const updated = prev.map(notif => ({ ...notif, read: true }))
+        // Update unread count in parent (should be 0 now)
+        onNotificationUpdate?.(0)
+        return updated
+      })
     } catch (err) {
       console.error('Failed to mark all notifications as read:', err)
     }

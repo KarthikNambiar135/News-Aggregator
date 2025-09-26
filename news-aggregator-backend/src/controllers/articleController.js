@@ -140,6 +140,33 @@ exports.submitArticle = async (req, res) => {
     // Check for achievements
     const achievementResult = await checkAchievements(req.user._id);
 
+    // Create notifications for all users except the author
+    const Notification = require('../models/Notification');
+    try {
+      const allUsers = await User.find({ _id: { $ne: req.user._id } }, '_id');
+      const notifications = allUsers.map(user => ({
+        userId: user._id,
+        type: 'new_article',
+        title: 'New Article Published',
+        message: `${req.user.username} published "${title}"`,
+        actionUrl: `/article/${article._id}`,
+        actionable: true,
+        metadata: {
+          articleId: article._id,
+          authorId: req.user._id,
+          category: category
+        }
+      }));
+
+      if (notifications.length > 0) {
+        await Notification.insertMany(notifications);
+        console.log(`📢 Created ${notifications.length} notifications for new article`);
+      }
+    } catch (notifError) {
+      console.error('Failed to create notifications:', notifError);
+      // Don't fail the article submission if notifications fail
+    }
+
     // Populate the response
     const populatedArticle = await Article.findById(article._id)
       .populate('submittedBy', 'name username role reputation badges');
@@ -514,4 +541,47 @@ const suggestCategory = (title = '', summary = '') => {
   }
 
   return 'other';
+};
+
+// 🗑️ Delete article (author only)
+exports.deleteArticle = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Find the article
+    const article = await Article.findById(id);
+    if (!article) {
+      return res.status(404).json({
+        message: 'Article not found'
+      });
+    }
+    
+    // Check if the user is the author or has admin privileges
+    if (article.submittedBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({
+        message: 'You are not authorized to delete this article'
+      });
+    }
+    
+    // Delete the article
+    await Article.findByIdAndDelete(id);
+    
+    // Also delete associated fact-checks and notifications
+    const FactCheck = require('../models/FactCheck');
+    const Notification = require('../models/Notification');
+    
+    await FactCheck.deleteMany({ articleId: id });
+    await Notification.deleteMany({ 'metadata.articleId': id });
+    
+    res.status(200).json({
+      message: 'Article deleted successfully'
+    });
+    
+  } catch (error) {
+    console.error('Delete article error:', error);
+    res.status(500).json({
+      message: 'Server error while deleting article',
+      error: error.message
+    });
+  }
 };

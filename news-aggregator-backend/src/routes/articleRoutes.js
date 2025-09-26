@@ -4,6 +4,7 @@ const {
   getArticles,
   getArticleById,
   voteArticle,
+  deleteArticle,
   getRankedArticles,
   getTrendingArticles,
   getArticlesByCategory,
@@ -26,6 +27,7 @@ router.get('/:id', getArticleById); // Get single article by ID
 router.post('/', protect, uploadImages, submitArticle); // Submit new article with file uploads
 router.post('/analyze-url', protect, analyzeUrl); // Analyze URL content
 router.post('/:id/vote', protect, voteArticle); // Vote on article
+router.delete('/:id', protect, deleteArticle); // Delete article (author only)
 router.get('/user/my-articles', protect, getUserArticles); // Get user's articles
 
 module.exports = router;

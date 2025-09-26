@@ -81,6 +81,7 @@ export const articlesAPI = {
   },
   analyzeUrl: (url) => api.post('/articles/analyze-url', { url }),
   voteArticle: (id, voteType) => api.post(`/articles/${id}/vote`, { voteType }),
+  deleteArticle: (id) => api.delete(`/articles/${id}`),
   getRankedArticles: (params) => api.get('/articles/ranked', { params }),
   getTrendingArticles: () => api.get('/articles/trending'),
   getArticlesByCategory: (category, params) => api.get(`/articles/category/${category}`, { params }),

@@ -5,11 +5,11 @@ import {
   User, Calendar, Eye, AlertTriangle, CheckCircle, Clock,
   FileText, Link2, Upload, X, PenTool, Award, Vote, Cpu, Globe,
   Heart, Atom, Users, DollarSign, BookOpen, Shield, Hash, 
-  Image as ImageIcon
+  Image as ImageIcon, Trash2
 } from 'lucide-react'
 import { articlesAPI, factChecksAPI } from '../utils/api'
 
-export const ArticleCard = ({ article, onFactCheck, onDiscuss }) => {
+export const ArticleCard = ({ article, currentUser, onFactCheck, onDiscuss, onVote, onDelete }) => {
   const getCredibilityColor = (score) => {
     if (score >= 85) return 'credibility-high'
     if (score >= 70) return 'credibility-medium'
@@ -72,14 +72,20 @@ export const ArticleCard = ({ article, onFactCheck, onDiscuss }) => {
         {/* Article Actions */}
         <div className="flex items-center justify-between pt-4 border-t">
           <div className="flex items-center space-x-6">
-            <button className="flex items-center space-x-2 text-green-600 hover:text-green-700 smooth-transition hover-lift button-press">
+            <button 
+              onClick={() => onVote?.(article._id, 'upvote')}
+              className="flex items-center space-x-2 text-green-600 hover:text-green-700 smooth-transition hover-lift button-press"
+            >
               <ThumbsUp className="w-5 h-5" />
-              <span>{article.verifications}</span>
+              <span>{article.upvotes || 0}</span>
             </button>
             
-            <button className="flex items-center space-x-2 text-red-600 hover:text-red-700 smooth-transition hover-lift button-press">
+            <button 
+              onClick={() => onVote?.(article._id, 'downvote')}
+              className="flex items-center space-x-2 text-red-600 hover:text-red-700 smooth-transition hover-lift button-press"
+            >
               <ThumbsDown className="w-5 h-5" />
-              <span>{article.disputes}</span>
+              <span>{article.downvotes || 0}</span>
             </button>
             
             <button 
@@ -99,6 +105,18 @@ export const ArticleCard = ({ article, onFactCheck, onDiscuss }) => {
             <button className="text-gray-600 hover:text-gray-700 smooth-transition hover-lift button-press">
               <ExternalLink className="w-5 h-5" />
             </button>
+            
+            {/* Delete button - only show for article author */}
+            {currentUser && article.submittedBy && 
+             (currentUser.id === article.submittedBy._id || currentUser._id === article.submittedBy._id) && (
+              <button 
+                onClick={() => onDelete?.(article._id)}
+                className="text-red-600 hover:text-red-700 smooth-transition hover-lift button-press"
+                title="Delete Article"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            )}
             
             <button 
               onClick={() => onFactCheck?.(article)}
@@ -232,8 +250,8 @@ export const FactCheckModal = ({ isOpen, onClose, article }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 backdrop-blur-sm bg-white/20 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <h2 className="text-2xl font-bold text-gray-900">Fact-Check Article</h2>
@@ -1160,8 +1178,8 @@ export const ArticleSubmissionForm = ({ isOpen, onClose, onSubmit }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 backdrop-blur-sm bg-white/20 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div>
@@ -1386,28 +1404,6 @@ export const ArticleSubmissionForm = ({ isOpen, onClose, onSubmit }) => {
                   </div>
                 </div>
               </div>
-
-              {/* Reference URL (for manual submissions) */}
-              {submissionType === 'manual' && (
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Reference URL <span className="text-gray-500 text-xs">(optional)</span>
-                  </label>
-                  <div className="relative">
-                    <Link2 className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="url"
-                      value={formData.url}
-                      onChange={(e) => handleInputChange('url', e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-dark-green focus:border-dark-green outline-none"
-                      placeholder="https://example.com/reference-article (optional)"
-                    />
-                  </div>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Add a reference URL if your article is based on or references another article
-                  </p>
-                </div>
-              )}
 
               {/* Title and Subtitle */}
               <div className="grid md:grid-cols-2 gap-6">
