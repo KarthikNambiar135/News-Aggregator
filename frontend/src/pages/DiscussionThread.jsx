@@ -225,16 +225,16 @@ const DiscussionThread = () => {
           
           <div className="space-y-4">
             {discussion.replies?.map((reply) => (
-              <div key={reply._id} className="border-l-2 border-gray-200 pl-4">
+              <div key={reply._id} className="border-l-4 border-green-200 pl-6 ml-4 bg-gray-50 rounded-r-lg py-3">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center space-x-2">
-                    <span className="font-medium">{reply.author?.username || 'Unknown'}</span>
+                    <span className="font-medium">{reply.userId?.username || reply.author?.username || 'Unknown'}</span>
                     <span className="text-sm text-gray-500">
                       {new Date(reply.createdAt).toLocaleDateString()}
                     </span>
                   </div>
                   
-                  {user && reply.author?._id === user._id && (
+                  {user && (reply.userId?._id === user._id || reply.author?._id === user._id) && (
                     <div className="flex space-x-2">
                       <button
                         onClick={() => {
