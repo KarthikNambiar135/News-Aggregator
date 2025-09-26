@@ -98,7 +98,12 @@ const DiscussionThread = () => {
       }))
     } catch (error) {
       console.error('Failed to vote on discussion:', error)
-      alert('Failed to vote')
+      
+      if (error.response?.status === 403 && error.response?.data?.isOwnContent) {
+        alert("You can't vote on your own discussion")
+      } else {
+        alert(error.response?.data?.message || 'Failed to vote')
+      }
     }
   }
 
@@ -108,7 +113,12 @@ const DiscussionThread = () => {
       loadDiscussion() // Reload to get updated vote counts
     } catch (error) {
       console.error('Failed to vote on reply:', error)
-      alert('Failed to vote')
+      
+      if (error.response?.status === 403 && error.response?.data?.isOwnContent) {
+        alert("You can't vote on your own reply")
+      } else {
+        alert(error.response?.data?.message || 'Failed to vote on reply')
+      }
     }
   }
 
