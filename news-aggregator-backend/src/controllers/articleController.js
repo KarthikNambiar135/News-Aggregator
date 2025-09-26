@@ -9,30 +9,90 @@ const { checkAchievements } = require('../utils/achievements');
 // 🔹 Submit new article
 exports.submitArticle = async (req, res) => {
   try {
-    const { url, title, summary, category, tags, sourceName } = req.body;
+    const { url, title, subtitle, description, summary, category, sourceName, submissionType } = req.body;
+    
+    // Handle tags and sources arrays from FormData
+    const tags = [];
+    const sources = [];
+    
+    // Extract arrays from FormData format
+    Object.keys(req.body).forEach(key => {
+      if (key.startsWith('tags[')) {
+        tags.push(req.body[key]);
+      } else if (key.startsWith('sources[')) {
+        sources.push(req.body[key]);
+      }
+    });
+    
+    // Handle uploaded image files
+    const uploadedImages = req.files || [];
+    const imageUrls = uploadedImages.map(file => `/uploads/${file.filename}`);
+    
+    console.log('📥 Article submission received:', {
+      submissionType,
+      url: url ? 'PROVIDED' : 'EMPTY',
+      title: title ? 'PROVIDED' : 'MISSING',
+      description: description ? 'PROVIDED' : 'MISSING',
+      category,
+      tagsCount: tags.length,
+      sourcesCount: sources.length,
+      imagesCount: uploadedImages.length
+    });
+    
+    // Use description as summary if summary is not provided
+    const articleSummary = summary || description;
 
-    // Check if article with this URL already exists
-    const existingArticle = await Article.findOne({ url });
-    if (existingArticle) {
-      return res.status(400).json({ message: 'Article with this URL already exists' });
+    let parsed = {};
+    let domain = null;
+
+    // Handle URL-based submissions
+    if (submissionType === 'url' || (url && url.trim())) {
+      // Validate URL
+      if (!url || !url.trim()) {
+        return res.status(400).json({ message: 'URL is required for URL-based submissions' });
+      }
+
+      // Validate URL format
+      try {
+        new URL(url);
+      } catch (error) {
+        return res.status(400).json({ message: 'Invalid URL format' });
+      }
+
+      // Check if article with this URL already exists
+      const existingArticle = await Article.findOne({ url });
+      if (existingArticle) {
+        return res.status(400).json({ message: 'Article with this URL already exists' });
+      }
+
+      // Auto-parse content from URL
+      parsed = await parseUrlContent(url);
+      
+      // Extract domain from URL
+      domain = new URL(url).hostname;
+    } else {
+      // Handle manual submissions
+      if (!title || !title.trim()) {
+        return res.status(400).json({ message: 'Title is required for manual submissions' });
+      }
+      if (!articleSummary || !articleSummary.trim()) {
+        return res.status(400).json({ message: 'Description is required for manual submissions' });
+      }
     }
-
-    // Auto-parse content from URL
-    const parsed = await parseUrlContent(url);
     
-    // Extract domain from URL
-    const domain = new URL(url).hostname;
-    
-    // Find or create source
-    let source = await Source.findOne({ domain });
-    if (!source && sourceName) {
-      source = await Source.create({
-        name: sourceName,
-        domain,
-        type: 'news-publication',
-        reliabilityScore: 50, // Default
-        totalArticles: 1
-      });
+    // Find or create source (only for URL-based submissions)
+    let source = null;
+    if (domain) {
+      source = await Source.findOne({ domain });
+      if (!source && sourceName) {
+        source = await Source.create({
+          name: sourceName,
+          domain,
+          type: 'news-publication',
+          reliabilityScore: 50, // Default
+          totalArticles: 1
+        });
+      }
     }
 
     // Get user info for denormalization
@@ -42,22 +102,22 @@ exports.submitArticle = async (req, res) => {
     const pointsEarned = 50; // Base points for article submission
     
     const article = await Article.create({
-      url,
+      url: url || null,
       title: title || parsed.title || 'Untitled',
-      summary: summary || parsed.summary,
-      fullContent: parsed.fullContent,
+      summary: articleSummary || parsed.summary || '',
+      fullContent: parsed.fullContent || articleSummary || '',
       category: category || 'other',
       tags: tags?.length ? tags : parsed.tags || [],
       submittedBy: req.user._id,
       submittedByUsername: user.username,
-      sourceName: sourceName || source?.name || domain,
+      sourceName: sourceName || source?.name || domain || 'Manual Submission',
       sourceDomain: domain,
       sourceReliability: source?.trustLevel || 'unknown',
       author: parsed.author,
       publishedAt: parsed.publishedAt,
-      imageUrl: parsed.image,
-      thumbnailUrl: parsed.image,
-      pointsEarned
+      imageUrl: imageUrls.length > 0 ? imageUrls[0] : parsed.image,
+      thumbnailUrl: imageUrls.length > 0 ? imageUrls[0] : parsed.image,
+      images: imageUrls // Store all uploaded image URLs
     });
 
     // Update user stats and reputation
@@ -92,7 +152,28 @@ exports.submitArticle = async (req, res) => {
       levelUp: achievementResult.levelUp
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('❌ Article submission error:', error.message);
+    console.error('Full error details:', error);
+    
+    // Check if it's a validation error
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.keys(error.errors).map(key => ({
+        field: key,
+        message: error.errors[key].message
+      }));
+      
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: validationErrors
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Failed to submit article',
+      error: error.message
+    });
   }
 };
 
@@ -356,4 +437,81 @@ exports.getUserArticles = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
+};
+
+// 🔹 Analyze URL content (for form pre-filling)
+exports.analyzeUrl = async (req, res) => {
+  try {
+    const { url } = req.body;
+
+    if (!url) {
+      return res.status(400).json({ message: 'URL is required' });
+    }
+
+    // Check if article with this URL already exists
+    const existingArticle = await Article.findOne({ url });
+    if (existingArticle) {
+      return res.status(400).json({ 
+        message: 'Article with this URL already exists',
+        existing: true,
+        article: existingArticle
+      });
+    }
+
+    // Parse content from URL
+    const parsed = await parseUrlContent(url);
+    
+    // Extract domain from URL
+    const domain = new URL(url).hostname;
+    
+    // Find existing source for reliability info
+    const source = await Source.findOne({ domain });
+
+    // Suggest category based on content
+    const suggestedCategory = suggestCategory(parsed.title, parsed.summary);
+
+    // Return analysis results
+    res.json({
+      title: parsed.title || '',
+      subtitle: parsed.subtitle || '',
+      description: parsed.summary || '',
+      author: parsed.author || '',
+      publishDate: parsed.publishedAt || new Date().toISOString(),
+      domain,
+      sourceReliability: source?.trustLevel || 'unknown',
+      reliabilityScore: source?.reliabilityScore || 0,
+      language: parsed.language || 'en',
+      suggestedCategory,
+      extractedTags: parsed.tags || [],
+      contentType: parsed.contentType || 'news',
+      imageUrl: parsed.image || '',
+      sourceExists: !!source,
+      sourceName: source?.name || domain
+    });
+  } catch (error) {
+    console.error('URL Analysis Error:', error);
+    res.status(500).json({ message: 'Failed to analyze URL', error: error.message });
+  }
+};
+
+// Helper function to suggest category based on content
+const suggestCategory = (title = '', summary = '') => {
+  const content = (title + ' ' + summary).toLowerCase();
+  
+  const categories = {
+    'technology': ['tech', 'ai', 'artificial intelligence', 'software', 'computer', 'digital', 'internet', 'startup', 'innovation'],
+    'science': ['research', 'study', 'scientific', 'discovery', 'experiment', 'climate', 'environment', 'health', 'medical'],
+    'politics': ['government', 'election', 'policy', 'political', 'congress', 'senate', 'president', 'minister'],
+    'business': ['economy', 'market', 'financial', 'company', 'business', 'economic', 'stock', 'investment'],
+    'sports': ['sport', 'game', 'team', 'player', 'match', 'championship', 'olympic', 'football', 'basketball'],
+    'entertainment': ['movie', 'music', 'celebrity', 'entertainment', 'film', 'actor', 'artist', 'show']
+  };
+
+  for (const [category, keywords] of Object.entries(categories)) {
+    if (keywords.some(keyword => content.includes(keyword))) {
+      return category;
+    }
+  }
+
+  return 'other';
 };

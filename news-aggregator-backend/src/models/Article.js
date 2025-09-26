@@ -3,12 +3,12 @@ const mongoose = require("mongoose");
 const articleSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
-    url: { type: String, required: true },
+    url: { type: String, required: false }, // Made optional to support manual submissions
     summary: { type: String },
     fullContent: { type: String },
     category: { 
       type: String, 
-      enum: ["politics", "tech", "health", "sports", "environment", "science", "social", "economy", "other"], 
+      enum: ["politics", "tech", "technology", "health", "sports", "environment", "science", "social", "economy", "education", "other"], 
       default: "other" 
     },
     tags: [String],
@@ -57,6 +57,7 @@ const articleSchema = new mongoose.Schema(
     // Image and media
     imageUrl: { type: String },
     thumbnailUrl: { type: String },
+    images: [{ type: String }], // Array of uploaded image URLs
     
     // Points and rewards
     pointsEarned: { type: Number, default: 50 }, // Points earned by submitter
