@@ -4,91 +4,44 @@ import {
   ExternalLink, Calendar, Award, Globe, Star,
   BarChart3, Users, FileText, Clock, X
 } from 'lucide-react'
-
-// Mock source reliability data
-const mockSourceData = [
-  {
-    id: 1,
-    name: 'Climate Science Journal',
-    domain: 'climatescience.org',
-    type: 'Academic Journal',
-    reliabilityScore: 92,
-    trustLevel: 'High',
-    established: '2008',
-    totalArticles: 1247,
-    verifiedArticles: 1156,
-    disputedArticles: 23,
-    expertEndorsements: 45,
-    peerReviewProcess: true,
-    impactFactor: 8.5,
-    specialties: ['Climate Science', 'Environmental Research'],
-    recentAccuracy: 96,
-    biasRating: 'Minimal',
-    transparencyScore: 9.2,
-    correctionPolicy: 'Excellent',
-    lastUpdated: '2025-01-15',
-    trends: {
-      reliability: [88, 89, 91, 92, 92],
-      volume: [12, 15, 18, 22, 18]
-    }
-  },
-  {
-    id: 2,
-    name: 'TechNews Daily',
-    domain: 'technews.com',
-    type: 'News Publication',
-    reliabilityScore: 67,
-    trustLevel: 'Medium',
-    established: '2015',
-    totalArticles: 3456,
-    verifiedArticles: 2234,
-    disputedArticles: 156,
-    expertEndorsements: 12,
-    peerReviewProcess: false,
-    impactFactor: null,
-    specialties: ['Technology', 'Startup News'],
-    recentAccuracy: 74,
-    biasRating: 'Slight Left',
-    transparencyScore: 6.8,
-    correctionPolicy: 'Good',
-    lastUpdated: '2025-01-14',
-    trends: {
-      reliability: [65, 63, 68, 69, 67],
-      volume: [45, 52, 48, 56, 51]
-    }
-  },
-  {
-    id: 3,
-    name: 'Health Research Institute',
-    domain: 'healthresearch.org',
-    type: 'Research Institution',
-    reliabilityScore: 89,
-    trustLevel: 'High',
-    established: '1995',
-    totalArticles: 892,
-    verifiedArticles: 834,
-    disputedArticles: 12,
-    expertEndorsements: 67,
-    peerReviewProcess: true,
-    impactFactor: 7.2,
-    specialties: ['Medical Research', 'Public Health'],
-    recentAccuracy: 94,
-    biasRating: 'Minimal',
-    transparencyScore: 8.9,
-    correctionPolicy: 'Excellent',
-    lastUpdated: '2025-01-15',
-    trends: {
-      reliability: [86, 87, 88, 89, 89],
-      volume: [8, 12, 15, 11, 14]
-    }
-  }
-]
+import { sourcesAPI } from '../utils/api'
 
 const SourceReliabilityDashboard = ({ isOpen, onClose }) => {
-  const [selectedSource, setSelectedSource] = useState(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filterType, setFilterType] = useState('all')
-  const [sortBy, setSortBy] = useState('reliability')
+  const [sources, setSources] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [trustFilter, setTrustFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('reliabilityScore')
+
+  // Load sources from API
+  useEffect(() => {
+    if (!isOpen) return
+    
+    loadSources()
+  }, [isOpen])
+
+  const loadSources = async () => {
+    try {
+      setLoading(true)
+      const response = await sourcesAPI.getSources({
+        page: 1,
+        limit: 100,
+        sortBy: sortBy,
+        sortOrder: 'desc'
+      })
+      
+      setSources(response.data.sources || [])
+      setError(null)
+    } catch (err) {
+      console.error('Failed to load sources:', err)
+      setError('Failed to load sources')
+      // Fallback to empty array instead of mock data
+      setSources([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   if (!isOpen) return null
 
@@ -101,19 +54,26 @@ const SourceReliabilityDashboard = ({ isOpen, onClose }) => {
     }
   }
 
+  const getTrustLevel = (score) => {
+    if (score >= 85) return 'High'
+    if (score >= 70) return 'Medium'
+    if (score >= 50) return 'Low'
+    return 'Very Low'
+  }
+
   const getReliabilityBarColor = (score) => {
     if (score >= 80) return 'bg-green-500'
     if (score >= 60) return 'bg-yellow-500'
     return 'bg-red-500'
   }
 
-  const filteredSources = mockSourceData.filter(source => {
-    const matchesSearch = source.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         source.domain.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredSources = sources.filter(source => {
+    const matchesSearch = (source.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (source.domain || '').toLowerCase().includes(searchQuery.toLowerCase())
     const matchesFilter = filterType === 'all' ||
-                         (filterType === 'high' && source.trustLevel === 'High') ||
-                         (filterType === 'medium' && source.trustLevel === 'Medium') ||
-                         (filterType === 'low' && source.trustLevel === 'Low')
+                         (filterType === 'high' && getTrustLevel(source.reliabilityScore || 0) === 'High') ||
+                         (filterType === 'medium' && getTrustLevel(source.reliabilityScore || 0) === 'Medium') ||
+                         (filterType === 'low' && getTrustLevel(source.reliabilityScore || 0) === 'Low')
     return matchesSearch && matchesFilter
   })
 
@@ -195,25 +155,25 @@ const SourceReliabilityDashboard = ({ isOpen, onClose }) => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">
-                {mockSourceData.filter(s => s.trustLevel === 'High').length}
+                {sources.filter(s => getTrustLevel(s.reliabilityScore || 0) === 'High').length}
               </div>
               <div className="text-gray-600 text-sm">High Reliability Sources</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">
-                {mockSourceData.reduce((sum, s) => sum + s.totalArticles, 0).toLocaleString()}
+                {sources.reduce((sum, s) => sum + (s.totalArticles || 0), 0).toLocaleString()}
               </div>
               <div className="text-gray-600 text-sm">Total Articles Analyzed</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-purple-600">
-                {Math.round(mockSourceData.reduce((sum, s) => sum + s.reliabilityScore, 0) / mockSourceData.length)}
+                {sources.length > 0 ? Math.round(sources.reduce((sum, s) => sum + (s.reliabilityScore || 0), 0) / sources.length) : 0}
               </div>
               <div className="text-gray-600 text-sm">Average Reliability Score</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">
-                {mockSourceData.reduce((sum, s) => sum + s.expertEndorsements, 0)}
+                {sources.reduce((sum, s) => sum + (s.expertEndorsements || 0), 0)}
               </div>
               <div className="text-gray-600 text-sm">Expert Endorsements</div>
             </div>

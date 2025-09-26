@@ -68,8 +68,20 @@ export const authAPI = {
 export const articlesAPI = {
   getArticles: (params) => api.get('/articles', { params }),
   getArticleById: (id) => api.get(`/articles/${id}`),
-  submitArticle: (data) => api.post('/articles', data),
+  submitArticle: (data) => {
+    // Check if data is FormData (for file uploads) or regular object
+    const isFormData = data instanceof FormData
+    return api.post('/articles', data, {
+      headers: isFormData ? {
+        'Content-Type': 'multipart/form-data'
+      } : {
+        'Content-Type': 'application/json'
+      }
+    })
+  },
+  analyzeUrl: (url) => api.post('/articles/analyze-url', { url }),
   voteArticle: (id, voteType) => api.post(`/articles/${id}/vote`, { voteType }),
+  deleteArticle: (id) => api.delete(`/articles/${id}`),
   getRankedArticles: (params) => api.get('/articles/ranked', { params }),
   getTrendingArticles: () => api.get('/articles/trending'),
   getArticlesByCategory: (category, params) => api.get(`/articles/category/${category}`, { params }),

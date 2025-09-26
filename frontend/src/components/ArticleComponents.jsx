@@ -1,14 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { 
   ThumbsUp, ThumbsDown, MessageSquare, Share2, ExternalLink, 
   User, Calendar, Eye, AlertTriangle, CheckCircle, Clock,
   FileText, Link2, Upload, X, PenTool, Award, Vote, Cpu, Globe,
   Heart, Atom, Users, DollarSign, BookOpen, Shield, Hash, 
-  Image as ImageIcon
+  Image as ImageIcon, Trash2
 } from 'lucide-react'
+import { articlesAPI, factChecksAPI } from '../utils/api'
 
-export const ArticleCard = ({ article, onFactCheck, onDiscuss }) => {
+export const ArticleCard = ({ article, currentUser, onFactCheck, onDiscuss, onVote, onDelete }) => {
   const getCredibilityColor = (score) => {
     if (score >= 85) return 'credibility-high'
     if (score >= 70) return 'credibility-medium'
@@ -54,15 +55,15 @@ export const ArticleCard = ({ article, onFactCheck, onDiscuss }) => {
             <div className="flex items-center space-x-4 text-sm text-gray-500">
               <div className="flex items-center space-x-1">
                 <User className="w-4 h-4" />
-                <span>{article.submittedBy}</span>
+                <span>{article.submittedBy?.username || article.submittedBy?.name || article.submittedByUsername || 'Unknown'}</span>
               </div>
               <div className="flex items-center space-x-1">
                 <Calendar className="w-4 h-4" />
-                <span>{new Date(article.submittedAt).toLocaleDateString()}</span>
+                <span>{new Date(article.createdAt || article.submittedAt).toLocaleDateString()}</span>
               </div>
               <div className="flex items-center space-x-1">
                 <Eye className="w-4 h-4" />
-                <span>{article.source}</span>
+                <span>{article.sourceName || 'Unknown Source'}</span>
               </div>
             </div>
           </div>
@@ -71,14 +72,20 @@ export const ArticleCard = ({ article, onFactCheck, onDiscuss }) => {
         {/* Article Actions */}
         <div className="flex items-center justify-between pt-4 border-t">
           <div className="flex items-center space-x-6">
-            <button className="flex items-center space-x-2 text-green-600 hover:text-green-700 smooth-transition hover-lift button-press">
+            <button 
+              onClick={() => onVote?.(article._id, 'upvote')}
+              className="flex items-center space-x-2 text-green-600 hover:text-green-700 smooth-transition hover-lift button-press"
+            >
               <ThumbsUp className="w-5 h-5" />
-              <span>{article.verifications}</span>
+              <span>{article.upvotes || 0}</span>
             </button>
             
-            <button className="flex items-center space-x-2 text-red-600 hover:text-red-700 smooth-transition hover-lift button-press">
+            <button 
+              onClick={() => onVote?.(article._id, 'downvote')}
+              className="flex items-center space-x-2 text-red-600 hover:text-red-700 smooth-transition hover-lift button-press"
+            >
               <ThumbsDown className="w-5 h-5" />
-              <span>{article.disputes}</span>
+              <span>{article.downvotes || 0}</span>
             </button>
             
             <button 
@@ -98,6 +105,18 @@ export const ArticleCard = ({ article, onFactCheck, onDiscuss }) => {
             <button className="text-gray-600 hover:text-gray-700 smooth-transition hover-lift button-press">
               <ExternalLink className="w-5 h-5" />
             </button>
+            
+            {/* Delete button - only show for article author */}
+            {currentUser && article.submittedBy && 
+             (currentUser.id === article.submittedBy._id || currentUser._id === article.submittedBy._id) && (
+              <button 
+                onClick={() => onDelete?.(article._id)}
+                className="text-red-600 hover:text-red-700 smooth-transition hover-lift button-press"
+                title="Delete Article"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            )}
             
             <button 
               onClick={() => onFactCheck?.(article)}
@@ -122,60 +141,45 @@ export const FactCheckModal = ({ isOpen, onClose, article }) => {
   const [flaggedConcerns, setFlaggedConcerns] = useState([])
   const [peerReviews, setPeerReviews] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  // Extract articleId from article prop
+  const articleId = article?._id || article?.id
 
-  // Mock peer reviews data
-  const mockPeerReviews = [
-    {
-      id: 1,
-      reviewer: 'DrFactChecker',
-      reputation: 2847,
-      verdict: 'verified',
-      confidence: 8,
-      expertise: ['Science', 'Health'],
-      evidence: 'The claims in this article are supported by multiple peer-reviewed studies published in Nature and Science journals. I\'ve cross-referenced the data with the original research papers.',
-      sources: [
-        'https://nature.com/articles/nature12345',
-        'https://science.org/doi/10.1126/science.abc123'
-      ],
-      submittedAt: '2025-01-15T14:30:00Z',
-      votes: { up: 23, down: 2 },
-      badges: ['Expert', 'Trusted Source'],
-      level: 'Expert'
-    },
-    {
-      id: 2,
-      reviewer: 'NewsValidator',
-      reputation: 2156,
-      verdict: 'needs-review',
-      confidence: 6,
-      expertise: ['Journalism', 'Media Analysis'],
-      evidence: 'While the scientific claims appear sound, the article uses sensationalized language that may mislead readers. The headline doesn\'t accurately reflect the study\'s limitations.',
-      sources: [
-        'https://journalismethics.org/guidelines/headline-accuracy'
-      ],
-      submittedAt: '2025-01-15T13:45:00Z',
-      votes: { up: 15, down: 3 },
-      badges: ['Trusted', 'Active'],
-      level: 'Advanced'
-    },
-    {
-      id: 3,
-      reviewer: 'TruthSeeker99',
-      reputation: 1834,
-      verdict: 'disputed',
-      confidence: 7,
-      expertise: ['Research Methods', 'Statistics'],
-      evidence: 'The statistical methodology described in the article has several issues. The sample size is too small for the conclusions drawn, and there\'s potential selection bias.',
-      sources: [
-        'https://stats-methods.org/sample-size-calculator',
-        'https://research-ethics.com/bias-detection'
-      ],
-      submittedAt: '2025-01-15T12:20:00Z',
-      votes: { up: 8, down: 12 },
-      badges: ['Rising Star'],
-      level: 'Intermediate'
+  // Load peer reviews from API
+  const loadPeerReviews = async () => {
+    try {
+      const response = await factChecksAPI.getFactChecksForArticle(articleId)
+      const factChecks = response.data.factChecks || []
+      
+      // Convert fact checks to peer review format
+      const reviews = factChecks.map(fc => ({
+        id: fc._id,
+        reviewer: fc.reviewerUsername,
+        reputation: fc.reviewer?.reputation || 0,
+        verdict: fc.verdict,
+        confidence: fc.confidence,
+        expertise: fc.expertise || [],
+        evidence: fc.evidence,
+        sources: fc.sources || [],
+        submittedAt: fc.createdAt,
+        votes: { up: fc.upvotes || 0, down: fc.downvotes || 0 },
+        badges: fc.reviewer?.badges || [],
+        level: fc.reviewer?.level || 'Member'
+      }))
+      
+      setPeerReviews(reviews)
+    } catch (error) {
+      console.error('Failed to load peer reviews:', error)
+      setPeerReviews([]) // Empty array instead of mock data
     }
-  ]
+  }
+
+  // Load peer reviews when component opens
+  useEffect(() => {
+    if (isOpen && articleId) {
+      loadPeerReviews()
+    }
+  }, [isOpen, articleId])
 
   const concernTypes = [
     { id: 'misleading_headline', name: 'Misleading Headline', description: 'Title doesn\'t match content' },
@@ -221,27 +225,33 @@ export const FactCheckModal = ({ isOpen, onClose, article }) => {
   const handleSubmitVerification = async () => {
     setIsSubmitting(true)
     
-    // Mock submission process
-    setTimeout(() => {
-      const newVerification = {
+    try {
+      const factCheckData = {
         verdict,
         confidence: confidenceLevel,
         evidence,
         sources: sources.filter(s => s.trim()),
-        expertiseArea,
-        flaggedConcerns,
-        submittedAt: new Date().toISOString()
+        expertise: expertiseArea ? [expertiseArea] : []
       }
       
-      console.log('Submitted verification:', newVerification)
+      await factChecksAPI.submitFactCheck(articleId, factCheckData)
+      
+      // Reload peer reviews to show the new submission
+      await loadPeerReviews()
+      
       setIsSubmitting(false)
       onClose()
-    }, 2000)
+    } catch (error) {
+      console.error('Failed to submit fact check:', error)
+      setIsSubmitting(false)
+      // Show error to user
+      alert('Failed to submit fact check. Please try again.')
+    }
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 backdrop-blur-sm bg-white/20 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <h2 className="text-2xl font-bold text-gray-900">Fact-Check Article</h2>
@@ -533,7 +543,7 @@ export const FactCheckModal = ({ isOpen, onClose, article }) => {
 
               {/* Peer Reviews List */}
               <div className="space-y-4">
-                {mockPeerReviews.map((review) => (
+                {peerReviews.map((review) => (
                   <div key={review.id} className="border rounded-lg p-6 space-y-4">
                     {/* Reviewer Header */}
                     <div className="flex items-start justify-between">
@@ -925,6 +935,7 @@ export const ArticleSubmissionForm = ({ isOpen, onClose, onSubmit }) => {
   const [urlAnalysis, setUrlAnalysis] = useState(null)
   const [errors, setErrors] = useState({})
   const [imagePreview, setImagePreview] = useState('')
+  const [uploadedImages, setUploadedImages] = useState([]) // Store actual file objects
 
   const categories = [
     { id: 'politics', name: 'Politics', icon: Vote },
@@ -958,36 +969,28 @@ export const ArticleSubmissionForm = ({ isOpen, onClose, onSubmit }) => {
     setIsLoading(true)
     setErrors({})
 
-    // Mock URL analysis - In real app, this would call an API
-    setTimeout(() => {
-      const mockAnalysis = {
-        title: "Revolutionary AI Breakthrough Changes Everything We Know",
-        subtitle: "New Research Reveals Unprecedented Capabilities",
-        description: "Scientists at major tech company announce breakthrough in artificial general intelligence capabilities that could reshape our understanding of machine learning and cognitive computing.",
-        domain: "technews.com",
-        publishDate: "2025-01-15",
-        author: "Dr. Sarah Chen",
-        sourceReliability: "medium",
-        language: "en",
-        suggestedCategory: "technology",
-        extractedTags: ["AI", "Technology", "Breakthrough", "Research"],
-        potentialBias: "neutral",
-        contentType: "news"
-      }
+    // Real URL analysis using API
+    try {
+      const response = await articlesAPI.analyzeUrl(formData.url.trim())
+      const analysis = response.data
 
-      setUrlAnalysis(mockAnalysis)
+      setUrlAnalysis(analysis)
       setFormData(prev => ({
         ...prev,
-        title: mockAnalysis.title,
-        subtitle: mockAnalysis.subtitle,
-        description: mockAnalysis.description,
-        category: mockAnalysis.suggestedCategory,
-        sourceType: mockAnalysis.contentType,
-        tags: mockAnalysis.extractedTags
+        title: analysis.title,
+        subtitle: analysis.subtitle,
+        description: analysis.description,
+        category: analysis.suggestedCategory,
+        sourceType: analysis.contentType,
+        tags: analysis.extractedTags
       }))
       setCurrentStep(2)
       setIsLoading(false)
-    }, 2000)
+    } catch (error) {
+      console.error('URL analysis failed:', error)
+      setErrors({ url: error.response?.data?.message || 'Failed to analyze URL' })
+      setIsLoading(false)
+    }
   }
 
   const handleInputChange = (field, value) => {
@@ -1024,6 +1027,68 @@ export const ArticleSubmissionForm = ({ isOpen, onClose, onSubmit }) => {
     img.src = url
   }
 
+  // File upload handlers
+  const handleImageUpload = (event, index) => {
+    const file = event.target.files[0]
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setErrors(prev => ({ ...prev, [`image_${index}`]: 'Please select a valid image file' }))
+        return
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setErrors(prev => ({ ...prev, [`image_${index}`]: 'Image size must be less than 5MB' }))
+        return
+      }
+
+      // Clear any previous errors
+      setErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors[`image_${index}`]
+        return newErrors
+      })
+
+      // Update uploaded images array
+      const newUploadedImages = [...uploadedImages]
+      newUploadedImages[index] = file
+      setUploadedImages(newUploadedImages)
+
+      // Create image URL for display purposes
+      const imageUrl = URL.createObjectURL(file)
+      const newImageUrls = [...formData.images]
+      newImageUrls[index] = imageUrl
+      setFormData(prev => ({ ...prev, images: newImageUrls }))
+
+      // Set preview for first image
+      if (index === 0) {
+        setImagePreview(imageUrl)
+      }
+    }
+  }
+
+  const removeImageUpload = (index) => {
+    // Remove from uploaded images
+    const newUploadedImages = uploadedImages.filter((_, i) => i !== index)
+    setUploadedImages(newUploadedImages)
+
+    // Remove from display URLs
+    const newImageUrls = formData.images.filter((_, i) => i !== index)
+    setFormData(prev => ({ ...prev, images: newImageUrls.length > 0 ? newImageUrls : [''] }))
+
+    // Clear preview if removing first image
+    if (index === 0) {
+      setImagePreview('')
+    }
+  }
+
+  const addImageUpload = () => {
+    if (uploadedImages.length < 5) {
+      setFormData(prev => ({ ...prev, images: [...prev.images, ''] }))
+    }
+  }
+
   const validateForm = () => {
     const newErrors = {}
     
@@ -1043,7 +1108,7 @@ export const ArticleSubmissionForm = ({ isOpen, onClose, onSubmit }) => {
   const calculatePointsBonus = () => {
     let bonus = 0
     const validSources = formData.sources.filter(s => s.trim()).length
-    const validImages = formData.images.filter(img => img.trim()).length
+    const validImages = uploadedImages.filter(img => img !== null && img !== undefined).length
     
     if (validSources > 0) bonus += validSources * 10
     if (validImages > 0) bonus += validImages * 5
@@ -1064,25 +1129,57 @@ export const ArticleSubmissionForm = ({ isOpen, onClose, onSubmit }) => {
     const basePoints = 50
     const bonusPoints = calculatePointsBonus()
 
-    const submissionData = {
-      ...formData,
-      submissionType,
-      tags: formData.tags.filter(tag => tag.trim()),
-      sources: formData.sources.filter(source => source.trim()),
-      images: formData.images.filter(img => img.trim()),
-      submittedAt: new Date().toISOString(),
-      status: 'pending-review',
-      pointsEarned: basePoints + bonusPoints,
-      analysis: urlAnalysis
+    // Create FormData for file uploads
+    const submissionFormData = new FormData()
+    
+    // Add basic fields
+    submissionFormData.append('submissionType', submissionType)
+    submissionFormData.append('title', formData.title)
+    submissionFormData.append('subtitle', formData.subtitle)
+    submissionFormData.append('description', formData.description)
+    submissionFormData.append('category', formData.category)
+    submissionFormData.append('sourceType', formData.sourceType)
+    submissionFormData.append('language', formData.language)
+    submissionFormData.append('priority', formData.priority)
+    
+    // Add URL if provided
+    if (formData.url && formData.url.trim()) {
+      submissionFormData.append('url', formData.url.trim())
+    }
+    
+    // Add tags
+    formData.tags.filter(tag => tag.trim()).forEach((tag, index) => {
+      submissionFormData.append(`tags[${index}]`, tag.trim())
+    })
+    
+    // Add sources
+    formData.sources.filter(source => source.trim()).forEach((source, index) => {
+      submissionFormData.append(`sources[${index}]`, source.trim())
+    })
+    
+    // Add image files
+    uploadedImages.forEach((file, index) => {
+      if (file) {
+        submissionFormData.append(`images`, file)
+      }
+    })
+    
+    // Add metadata
+    submissionFormData.append('submittedAt', new Date().toISOString())
+    submissionFormData.append('status', 'pending-review')
+    submissionFormData.append('pointsEarned', basePoints + bonusPoints)
+    
+    if (urlAnalysis) {
+      submissionFormData.append('analysis', JSON.stringify(urlAnalysis))
     }
 
-    onSubmit?.(submissionData)
+    onSubmit?.(submissionFormData)
     onClose()
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 backdrop-blur-sm bg-white/20 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div>
@@ -1395,45 +1492,53 @@ export const ArticleSubmissionForm = ({ isOpen, onClose, onSubmit }) => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Images <span className="text-green-600 text-xs">(+5 points each, max 5)</span>
                 </label>
+                <p className="text-sm text-gray-600 mb-3">Upload images to make your article more engaging (JPG, PNG, max 5MB each)</p>
+                
                 {formData.images.map((image, index) => (
-                  <div key={index} className="flex items-center space-x-2 mb-2">
-                    <div className="relative flex-1">
-                      <ImageIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="url"
-                        value={image}
-                        onChange={(e) => {
-                          handleArrayFieldChange('images', index, e.target.value)
-                          if (e.target.value && index === 0) validateImage(e.target.value)
-                        }}
-                        placeholder="https://example.com/image.jpg"
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-dark-green focus:border-dark-green outline-none"
-                      />
+                  <div key={index} className="mb-3">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleImageUpload(e, index)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-dark-green focus:border-dark-green outline-none file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-dark-green file:text-white hover:file:bg-opacity-90"
+                        />
+                      </div>
+                      {formData.images.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeImageUpload(index)}
+                          className="text-red-500 hover:text-red-700 transition-colors"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      )}
                     </div>
-                    {formData.images.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeArrayField('images', index)}
-                        className="text-red-500 hover:text-red-700 transition-colors"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
+                    
+                    {/* Image Preview */}
+                    {image && (
+                      <div className="mt-2">
+                        <img src={image} alt={`Preview ${index + 1}`} className="w-32 h-20 object-cover rounded-lg border" />
+                      </div>
+                    )}
+                    
+                    {/* Error Message */}
+                    {errors[`image_${index}`] && (
+                      <p className="text-red-500 text-sm mt-1">{errors[`image_${index}`]}</p>
                     )}
                   </div>
                 ))}
+                
                 {formData.images.length < 5 && (
                   <button
                     type="button"
-                    onClick={() => addArrayField('images')}
-                    className="text-dark-green hover:text-opacity-80 transition-colors text-sm font-medium"
+                    onClick={addImageUpload}
+                    className="flex items-center space-x-2 text-dark-green hover:text-opacity-80 transition-colors text-sm font-medium"
                   >
-                    + Add Another Image
+                    <ImageIcon className="w-4 h-4" />
+                    <span>+ Add Another Image</span>
                   </button>
-                )}
-                {imagePreview && (
-                  <div className="mt-3">
-                    <img src={imagePreview} alt="Preview" className="w-32 h-20 object-cover rounded-lg border" />
-                  </div>
                 )}
               </div>
 

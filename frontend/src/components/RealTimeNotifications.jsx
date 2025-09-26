@@ -3,122 +3,92 @@ import {
   Bell, X, CheckCircle, AlertTriangle, Clock, Users, 
   MessageSquare, TrendingUp, Shield, Award 
 } from 'lucide-react'
+import { notificationsAPI } from '../utils/api'
 
-// Mock real-time notifications
-const mockNotifications = [
-  {
-    id: 1,
-    type: 'article_verified',
-    title: 'Article Verified',
-    message: 'Your submitted article "Climate Research Breakthrough" has been verified by the community.',
-    timestamp: '2 minutes ago',
-    icon: CheckCircle,
-    color: 'green',
-    read: false,
-    actionable: true,
-    link: '/dashboard/article/123'
-  },
-  {
-    id: 2,
-    type: 'fact_check_disputed',
-    title: 'Fact-Check Disputed',
-    message: 'Your fact-check on "AI Technology News" has been disputed by 3 community members.',
-    timestamp: '15 minutes ago',
-    icon: AlertTriangle,
-    color: 'red',
-    read: false,
-    actionable: true,
-    link: '/dashboard/article/456'
-  },
-  {
-    id: 3,
-    type: 'reputation_milestone',
-    title: 'Reputation Milestone!',
-    message: 'Congratulations! You\'ve reached 1000 reputation points.',
-    timestamp: '1 hour ago',
-    icon: Award,
-    color: 'purple',
-    read: false,
-    actionable: false
-  },
-  {
-    id: 4,
-    type: 'new_discussion',
-    title: 'New Discussion',
-    message: 'DrFactChecker mentioned you in "Best practices for climate data verification"',
-    timestamp: '2 hours ago',
-    icon: MessageSquare,
-    color: 'blue',
-    read: true,
-    actionable: true,
-    link: '/dashboard/community/discussion/789'
-  },
-  {
-    id: 5,
-    type: 'trending_article',
-    title: 'Trending Article',
-    message: 'Article you fact-checked is now trending with 500+ views',
-    timestamp: '3 hours ago',
-    icon: TrendingUp,
-    color: 'orange',
-    read: true,
-    actionable: true,
-    link: '/dashboard/article/321'
-  },
-  {
-    id: 6,
-    type: 'expert_endorsement',
-    title: 'Expert Endorsement',
-    message: 'Your fact-check has been endorsed by 2 domain experts',
-    timestamp: '5 hours ago',
-    icon: Shield,
-    color: 'green',
-    read: true,
-    actionable: false
-  },
-  {
-    id: 7,
-    type: 'community_activity',
-    title: 'High Community Activity',
-    message: '15 new articles submitted in your expertise area today',
-    timestamp: '6 hours ago',
-    icon: Users,
-    color: 'blue',
-    read: true,
-    actionable: true,
-    link: '/dashboard?filter=expertise'
-  }
-]
-
-const RealTimeNotifications = ({ isOpen, onClose }) => {
-  const [notifications, setNotifications] = useState(mockNotifications)
+const RealTimeNotifications = ({ isOpen, onClose, onNotificationUpdate }) => {
+  const [notifications, setNotifications] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [filter, setFilter] = useState('all')
 
-  // Simulate real-time updates
+  // Load notifications from API
   useEffect(() => {
     if (!isOpen) return
-
+    
+    loadNotifications()
+    
+    // Set up polling for new notifications every 30 seconds
     const interval = setInterval(() => {
-      // Simulate new notification every 30 seconds
-      if (Math.random() > 0.7) {
-        const newNotification = {
-          id: Date.now(),
-          type: 'new_submission',
-          title: 'New Article Submission',
-          message: 'A new article has been submitted in your expertise area',
-          timestamp: 'Just now',
-          icon: Clock,
-          color: 'blue',
-          read: false,
-          actionable: true,
-          link: '/dashboard'
-        }
-        setNotifications(prev => [newNotification, ...prev])
-      }
+      loadNotifications()
     }, 30000)
 
     return () => clearInterval(interval)
   }, [isOpen])
+
+  const loadNotifications = async () => {
+    try {
+      setLoading(true)
+      const response = await notificationsAPI.getUserNotifications({
+        page: 1,
+        limit: 50
+      })
+      
+      const formattedNotifications = response.data.notifications.map(notif => ({
+        id: notif._id,
+        type: notif.type,
+        title: notif.title,
+        message: notif.message,
+        timestamp: notif.timeAgo || formatTimeAgo(notif.createdAt),
+        icon: getNotificationIcon(notif.type),
+        color: notif.color || 'blue',
+        read: notif.isRead,
+        actionable: notif.actionable,
+        link: notif.actionUrl
+      }))
+      
+      setNotifications(formattedNotifications)
+      setError(null)
+      
+      // Update unread count in parent component
+      const unreadCount = formattedNotifications.filter(n => !n.read).length
+      onNotificationUpdate?.(unreadCount)
+    } catch (err) {
+      console.error('Failed to load notifications:', err)
+      setError('Failed to load notifications')
+      // Fallback to empty array for now
+      setNotifications([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getNotificationIcon = (type) => {
+    const iconMap = {
+      'article_verified': CheckCircle,
+      'fact_check_disputed': AlertTriangle,
+      'reputation_milestone': Award,
+      'new_discussion': MessageSquare,
+      'trending_article': TrendingUp,
+      'expert_endorsement': Shield,
+      'community_activity': Users,
+      'default': Clock
+    }
+    return iconMap[type] || iconMap.default
+  }
+
+  const formatTimeAgo = (dateString) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diff = now - date
+    const minutes = Math.floor(diff / 60000)
+    const hours = Math.floor(diff / 3600000)
+    const days = Math.floor(diff / 86400000)
+    
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes} minutes ago`;
+    if (hours < 24) return `${hours} hours ago`;
+    return `${days} days ago`;
+  }
 
   if (!isOpen) return null
 
@@ -134,22 +104,44 @@ const RealTimeNotifications = ({ isOpen, onClose }) => {
     return colors[color] || colors.gray
   }
 
-  const markAsRead = (id) => {
-    setNotifications(prev => 
-      prev.map(notif => 
-        notif.id === id ? { ...notif, read: true } : notif
-      )
-    )
+  const markAsRead = async (id) => {
+    try {
+      await notificationsAPI.markNotificationAsRead(id)
+      setNotifications(prev => {
+        const updated = prev.map(notif => 
+          notif.id === id ? { ...notif, read: true } : notif
+        )
+        // Update unread count in parent
+        const unreadCount = updated.filter(n => !n.read).length
+        onNotificationUpdate?.(unreadCount)
+        return updated
+      })
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err)
+    }
   }
 
-  const markAllAsRead = () => {
-    setNotifications(prev => 
-      prev.map(notif => ({ ...notif, read: true }))
-    )
+  const markAllAsRead = async () => {
+    try {
+      await notificationsAPI.markAllNotificationsAsRead()
+      setNotifications(prev => {
+        const updated = prev.map(notif => ({ ...notif, read: true }))
+        // Update unread count in parent (should be 0 now)
+        onNotificationUpdate?.(0)
+        return updated
+      })
+    } catch (err) {
+      console.error('Failed to mark all notifications as read:', err)
+    }
   }
 
-  const deleteNotification = (id) => {
-    setNotifications(prev => prev.filter(notif => notif.id !== id))
+  const deleteNotification = async (id) => {
+    try {
+      await notificationsAPI.deleteNotification(id)
+      setNotifications(prev => prev.filter(notif => notif.id !== id))
+    } catch (err) {
+      console.error('Failed to delete notification:', err)
+    }
   }
 
   const filteredNotifications = notifications.filter(notif => {
@@ -236,7 +228,23 @@ const RealTimeNotifications = ({ isOpen, onClose }) => {
 
         {/* Notifications List */}
         <div className="max-h-96 overflow-y-auto custom-scrollbar">
-          {filteredNotifications.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-12">
+              <Clock className="w-12 h-12 text-gray-300 mx-auto mb-4 animate-pulse" />
+              <p className="text-gray-500">Loading notifications...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-12">
+              <AlertTriangle className="w-12 h-12 text-red-300 mx-auto mb-4" />
+              <p className="text-red-500">{error}</p>
+              <button 
+                onClick={loadNotifications}
+                className="mt-2 text-dark-green hover:text-opacity-80 text-sm font-medium"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : filteredNotifications.length === 0 ? (
             <div className="text-center py-12">
               <Bell className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500">No notifications to show</p>

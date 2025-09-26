@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { ArticleCard, FactCheckModal, ArticleSubmissionForm } from '../components/ArticleComponents'
@@ -91,18 +91,20 @@ const Dashboard = () => {
     loadNotifications()
   }, [])
 
-  // Load user statistics
-  useEffect(() => {
-    const loadUserStats = async () => {
-      try {
-        const response = await authAPI.getUserStats()
-        setUserStats(response.data)
-      } catch (err) {
-        console.error('Failed to load user stats:', err)
-      }
+  // Load user statistics function
+  const loadUserStats = useCallback(async () => {
+    try {
+      const response = await authAPI.getUserStats()
+      setUserStats(response.data)
+    } catch (err) {
+      console.error('Failed to load user stats:', err)
     }
-    loadUserStats()
   }, [])
+
+  // Load user statistics on mount
+  useEffect(() => {
+    loadUserStats()
+  }, [loadUserStats])
 
   const categories = [
     { id: 'all', name: 'All News', icon: <Home className="w-5 h-5" />, path: '/dashboard', isCategory: true },
@@ -129,6 +131,44 @@ const Dashboard = () => {
 
   const handleDiscuss = (article) => {
     console.log('Discussing article:', article.title)
+    // Navigate to community page with article discussion
+    navigate(`/dashboard/community?article=${article._id}&discuss=true`)
+  }
+
+  const handleVote = async (articleId, voteType) => {
+    try {
+      await articlesAPI.voteArticle(articleId, voteType)
+      // Refresh articles to show updated vote counts
+      loadArticles()
+    } catch (error) {
+      console.error('Failed to vote:', error)
+      setToast({
+        message: 'Failed to vote. Please try again.',
+        type: 'error'
+      })
+    }
+  }
+
+  const handleDeleteArticle = async (articleId) => {
+    if (!window.confirm('Are you sure you want to delete this article? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      await articlesAPI.deleteArticle(articleId)
+      setToast({
+        message: 'Article deleted successfully',
+        type: 'success'
+      })
+      // Refresh articles to remove the deleted one
+      loadArticles()
+    } catch (error) {
+      console.error('Failed to delete article:', error)
+      setToast({
+        message: 'Failed to delete article. Please try again.',
+        type: 'error'
+      })
+    }
   }
 
   return (
@@ -366,6 +406,9 @@ const Dashboard = () => {
                   setFilterType={setFilterType}
                   handleFactCheck={handleFactCheck}
                   handleDiscuss={handleDiscuss}
+                  handleVote={handleVote}
+                  handleDeleteArticle={handleDeleteArticle}
+                  currentUser={user}
                   articles={articles}
                   loading={loading}
                   error={error}
@@ -435,6 +478,7 @@ const Dashboard = () => {
       <RealTimeNotifications
         isOpen={notificationsOpen}
         onClose={() => setNotificationsOpen(false)}
+        onNotificationUpdate={(unreadCount) => setUnreadNotifications(unreadCount)}
       />
 
       <AchievementsModal
@@ -469,6 +513,9 @@ const DashboardHome = ({
   filterType, 
   handleFactCheck, 
   handleDiscuss,
+  handleVote,
+  handleDeleteArticle,
+  currentUser,
   articles,
   loading,
   error
@@ -602,8 +649,11 @@ const DashboardHome = ({
             <ArticleCard
               key={article._id || article.id}
               article={article}
+              currentUser={currentUser}
               onFactCheck={handleFactCheck}
               onDiscuss={handleDiscuss}
+              onVote={handleVote}
+              onDelete={handleDeleteArticle}
             />
           ))
         )}
