@@ -143,8 +143,13 @@ const Dashboard = () => {
       return response.data
     } catch (error) {
       console.error('Failed to vote:', error)
+      
+      // Handle specific error messages
+      const errorMessage = error.response?.data?.message || 'Failed to vote. Please try again.'
+      const isOwnArticle = errorMessage.includes('cannot vote on your own article')
+      
       setToast({
-        message: 'Failed to vote. Please try again.',
+        message: isOwnArticle ? "You can't vote on your own article" : errorMessage,
         type: 'error'
       })
       throw error
@@ -177,7 +182,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-gray-50 flex">
       <SmoothCursor />
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform lg:translate-x-0 lg:static lg:inset-0`}>
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform lg:translate-x-0 flex flex-col`}>
         <div className="flex items-center justify-between p-6 border-b">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-dark-green rounded-lg flex items-center justify-center">
@@ -235,7 +240,7 @@ const Dashboard = () => {
         </div>
 
         {/* Navigation */}
-        <nav className="p-4 space-y-2">
+        <nav className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-2">
           {categories.map((category) => {
             // Handle page navigation (community, sources)
             if (category.path && !category.isCategory) {
@@ -279,7 +284,7 @@ const Dashboard = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 lg:ml-0">
+      <div className="flex-1 lg:ml-64">
         {/* Header */}
         <header className="bg-white shadow-sm border-b sticky top-0 z-40">
           <div className="px-6 py-4">

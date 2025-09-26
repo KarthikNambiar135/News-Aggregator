@@ -115,6 +115,18 @@ export const communityAPI = {
   getTrendingTopics: (params) => api.get('/community/trending', { params }),
 };
 
+export const discussionsAPI = {
+  getDiscussions: (params) => api.get('/discussions', { params }),
+  getDiscussionById: (id) => api.get(`/discussions/${id}`),
+  createDiscussion: (data) => api.post('/discussions', data),
+  addReply: (discussionId, data) => api.post(`/discussions/${discussionId}/replies`, data),
+  voteDiscussion: (discussionId, data) => api.post(`/discussions/${discussionId}/vote`, data),
+  voteReply: (discussionId, replyId, data) => api.post(`/discussions/${discussionId}/replies/${replyId}/vote`, data),
+  deleteDiscussion: (id) => api.delete(`/discussions/${id}`),
+  deleteReply: (discussionId, replyId) => api.delete(`/discussions/${discussionId}/replies/${replyId}`),
+  editReply: (discussionId, replyId, data) => api.put(`/discussions/${discussionId}/replies/${replyId}`, data),
+};
+
 export const notificationsAPI = {
   getUserNotifications: (params) => api.get('/notifications', { params }),
   markNotificationAsRead: (id) => api.put(`/notifications/${id}/read`),

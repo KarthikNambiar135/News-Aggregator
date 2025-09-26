@@ -555,19 +555,30 @@ export const FactCheckModal = ({ isOpen, onClose, article }) => {
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
                   <div>
-                    <div className="text-2xl font-bold text-green-600">8</div>
+                    <div className="text-2xl font-bold text-green-600">
+                      {peerReviews.filter(r => r.verdict === 'verified').length}
+                    </div>
                     <div className="text-sm text-gray-600">Verified</div>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-red-600">3</div>
+                    <div className="text-2xl font-bold text-red-600">
+                      {peerReviews.filter(r => r.verdict === 'disputed').length}
+                    </div>
                     <div className="text-sm text-gray-600">Disputed</div>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-yellow-600">4</div>
+                    <div className="text-2xl font-bold text-yellow-600">
+                      {peerReviews.filter(r => r.verdict === 'needs_review').length}
+                    </div>
                     <div className="text-sm text-gray-600">Needs Review</div>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-gray-600">7.2</div>
+                    <div className="text-2xl font-bold text-gray-600">
+                      {peerReviews.length > 0 ? 
+                        (peerReviews.reduce((sum, r) => sum + r.confidence, 0) / peerReviews.length).toFixed(1) : 
+                        'N/A'
+                      }
+                    </div>
                     <div className="text-sm text-gray-600">Avg. Confidence</div>
                   </div>
                 </div>
@@ -724,45 +735,59 @@ export const FactCheckModal = ({ isOpen, onClose, article }) => {
 
               {/* Original Sources */}
               <div>
-                <h4 className="font-medium text-gray-900 mb-3">Original Sources</h4>
+                <h4 className="font-medium text-gray-900 mb-3">Article Sources</h4>
                 <div className="space-y-3">
-                  <div className="border rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center space-x-3">
-                        <FileText className="w-5 h-5 text-gray-500" />
-                        <div>
-                          <div className="font-medium text-gray-900">Climate Science Journal</div>
-                          <div className="text-sm text-gray-600">Primary research publication</div>
+                  {/* Primary Article Source */}
+                  {article?.url && (
+                    <div className="border rounded-lg p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center space-x-3">
+                          <Globe className="w-5 h-5 text-gray-500" />
+                          <div>
+                            <div className="font-medium text-gray-900">{article.sourceName || 'Primary Source'}</div>
+                            <div className="text-sm text-gray-600">Original article source</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            article.sourceReliability === 'high' ? 'bg-green-100 text-green-800' :
+                            article.sourceReliability === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                            article.sourceReliability === 'low' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {article.sourceReliability ? `${article.sourceReliability.charAt(0).toUpperCase() + article.sourceReliability.slice(1)} Reliability` : 'Unknown Reliability'}
+                          </span>
+                          <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
-                          High Reliability
-                        </span>
-                        <button className="text-blue-600 hover:text-blue-700">
-                          <ExternalLink className="w-4 h-4" />
-                        </button>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600">Category:</span>
+                          <div className="font-medium">{article.category || 'N/A'}</div>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Status:</span>
+                          <div className={`font-medium ${
+                            article.status === 'verified' ? 'text-green-600' :
+                            article.status === 'disputed' ? 'text-red-600' :
+                            'text-yellow-600'
+                          }`}>
+                            {article.status ? article.status.charAt(0).toUpperCase() + article.status.slice(1) : 'N/A'}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Credibility:</span>
+                          <div className="font-medium">{article.credibilityScore || 'N/A'}/100</div>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Views:</span>
+                          <div className="font-medium">{article.viewCount || 0}</div>
+                        </div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <span className="text-gray-600">Domain Age:</span>
-                        <div className="font-medium">15 years</div>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Peer Review:</span>
-                        <div className="font-medium text-green-600">Yes</div>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Impact Factor:</span>
-                        <div className="font-medium">8.5</div>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Citations:</span>
-                        <div className="font-medium">1,247</div>
-                      </div>
-                    </div>
-                  </div>
+                  )}
 
                   <div className="border rounded-lg p-4">
                     <div className="flex items-start justify-between mb-3">
