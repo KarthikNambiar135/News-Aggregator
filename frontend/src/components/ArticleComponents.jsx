@@ -10,6 +10,30 @@ import {
 import { articlesAPI, factChecksAPI } from '../utils/api'
 
 export const ArticleCard = ({ article, currentUser, onFactCheck, onDiscuss, onVote, onDelete }) => {
+  const [voteState, setVoteState] = useState({
+    userVote: article.userVote || null,
+    upvotes: article.upvotes || 0,
+    downvotes: article.downvotes || 0
+  })
+
+  const handleVote = async (voteType) => {
+    if (!onVote) return
+
+    try {
+      const result = await onVote(article._id, voteType)
+      
+      // Update local state with response from backend
+      if (result && result.userVote !== undefined) {
+        setVoteState({
+          userVote: result.userVote,
+          upvotes: result.upvotes,
+          downvotes: result.downvotes
+        })
+      }
+    } catch (error) {
+      console.error('Vote failed:', error)
+    }
+  }
   const getCredibilityColor = (score) => {
     if (score >= 85) return 'credibility-high'
     if (score >= 70) return 'credibility-medium'
@@ -73,19 +97,27 @@ export const ArticleCard = ({ article, currentUser, onFactCheck, onDiscuss, onVo
         <div className="flex items-center justify-between pt-4 border-t">
           <div className="flex items-center space-x-6">
             <button 
-              onClick={() => onVote?.(article._id, 'upvote')}
-              className="flex items-center space-x-2 text-green-600 hover:text-green-700 smooth-transition hover-lift button-press"
+              onClick={() => handleVote('upvote')}
+              className={`flex items-center space-x-2 smooth-transition hover-lift button-press ${
+                voteState.userVote === 'upvote' 
+                  ? 'text-white bg-green-600 px-3 py-1 rounded-lg shadow-md' 
+                  : 'text-green-600 hover:text-green-700'
+              }`}
             >
-              <ThumbsUp className="w-5 h-5" />
-              <span>{article.upvotes || 0}</span>
+              <ThumbsUp className={`w-5 h-5 ${voteState.userVote === 'upvote' ? 'fill-current' : ''}`} />
+              <span>{voteState.upvotes}</span>
             </button>
             
             <button 
-              onClick={() => onVote?.(article._id, 'downvote')}
-              className="flex items-center space-x-2 text-red-600 hover:text-red-700 smooth-transition hover-lift button-press"
+              onClick={() => handleVote('downvote')}
+              className={`flex items-center space-x-2 smooth-transition hover-lift button-press ${
+                voteState.userVote === 'downvote' 
+                  ? 'text-white bg-red-600 px-3 py-1 rounded-lg shadow-md' 
+                  : 'text-red-600 hover:text-red-700'
+              }`}
             >
-              <ThumbsDown className="w-5 h-5" />
-              <span>{article.downvotes || 0}</span>
+              <ThumbsDown className={`w-5 h-5 ${voteState.userVote === 'downvote' ? 'fill-current' : ''}`} />
+              <span>{voteState.downvotes}</span>
             </button>
             
             <button 
