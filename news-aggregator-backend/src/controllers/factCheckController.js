@@ -7,6 +7,12 @@ const { checkAchievements } = require('../utils/achievements');
 // 🔹 Submit fact-check
 exports.submitFactCheck = async (req, res) => {
   try {
+    console.log('🔹 Fact-check submission attempt:', {
+      articleId: req.params.articleId,
+      userId: req.user?._id,
+      body: req.body
+    });
+
     const { articleId } = req.params;
     const { verdict, confidence, evidence, sources, expertise } = req.body;
 
@@ -29,9 +35,22 @@ exports.submitFactCheck = async (req, res) => {
     }
 
     // Get user info
+    console.log('📱 Getting user info...');
     const user = await User.findById(req.user._id);
+    console.log('✅ User found:', user?.username);
 
     // Create fact-check
+    console.log('📝 Creating fact-check with data:', {
+      articleId,
+      reviewer: req.user._id,
+      reviewerUsername: user.username,
+      verdict,
+      confidence,
+      evidence: evidence?.substring(0, 50) + '...',
+      sourcesCount: sources?.length || 0,
+      expertiseCount: expertise?.length || 0
+    });
+
     const factCheck = await FactCheck.create({
       articleId,
       reviewer: req.user._id,
@@ -43,8 +62,11 @@ exports.submitFactCheck = async (req, res) => {
       expertise: expertise || user.specialties || [],
       reviewerReputationAtTime: user.reputation
     });
+    
+    console.log('✅ Fact-check created:', factCheck._id);
 
     // Update article stats
+    console.log('📊 Updating article stats...');
     const verificationField = verdict === 'true' || verdict === 'mostly-true' ? 'verifications' : 'disputes';
     await Article.findByIdAndUpdate(articleId, {
       $inc: { 
@@ -52,6 +74,7 @@ exports.submitFactCheck = async (req, res) => {
         [verificationField]: 1
       }
     });
+    console.log('✅ Article stats updated');
 
     // Calculate points for fact-checking
     const pointsEarned = 25; // Base points for fact-checking
@@ -67,28 +90,44 @@ exports.submitFactCheck = async (req, res) => {
     });
 
     // Calculate new credibility score for article
-    await updateArticleCredibilityScore(articleId);
+    try {
+      await updateArticleCredibilityScore(articleId);
+    } catch (credibilityError) {
+      console.error('Error updating credibility score:', credibilityError);
+      // Continue without failing the fact-check submission
+    }
 
     // Create notification for article submitter
-    if (article.submittedBy.toString() !== req.user._id.toString()) {
-      await Notification.createNotification({
-        userId: article.submittedBy,
-        type: 'fact_check_disputed',
-        title: 'New Fact-Check on Your Article',
-        message: `${user.username} has fact-checked your article "${article.title}"`,
-        relatedArticle: articleId,
-        relatedFactCheck: factCheck._id,
-        actionable: true,
-        actionUrl: `/dashboard/article/${articleId}`,
-        actionText: 'View Fact-Check',
-        icon: 'Shield',
-        color: verdict === 'true' || verdict === 'mostly-true' ? 'green' : 'red',
-        category: 'verification'
-      });
+    try {
+      if (article.submittedBy.toString() !== req.user._id.toString()) {
+        await Notification.createNotification({
+          userId: article.submittedBy,
+          type: 'fact_check_disputed',
+          title: 'New Fact-Check on Your Article',
+          message: `${user.username} has fact-checked your article "${article.title}"`,
+          relatedArticle: articleId,
+          relatedFactCheck: factCheck._id,
+          actionable: true,
+          actionUrl: `/dashboard/article/${articleId}`,
+          actionText: 'View Fact-Check',
+          icon: 'Shield',
+          color: verdict === 'true' || verdict === 'mostly-true' ? 'green' : 'red',
+          category: 'verification'
+        });
+      }
+    } catch (notificationError) {
+      console.error('Error creating notification:', notificationError);
+      // Continue without failing the fact-check submission
     }
 
     // Check for achievements
-    const achievementResult = await checkAchievements(req.user._id);
+    let achievementResult = { achievements: [], levelUp: false };
+    try {
+      achievementResult = await checkAchievements(req.user._id);
+    } catch (achievementError) {
+      console.error('Error checking achievements:', achievementError);
+      // Continue without failing the fact-check submission
+    }
 
     // Populate response
     const populatedFactCheck = await FactCheck.findById(factCheck._id)
@@ -102,7 +141,9 @@ exports.submitFactCheck = async (req, res) => {
       levelUp: achievementResult.levelUp
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('❌ Submit fact-check error:', error);
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 

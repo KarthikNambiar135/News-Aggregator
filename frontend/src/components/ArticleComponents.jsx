@@ -258,8 +258,15 @@ export const FactCheckModal = ({ isOpen, onClose, article }) => {
     setIsSubmitting(true)
     
     try {
+      // Map frontend verdict values to backend enum values
+      const verdictMapping = {
+        'verified': 'true',
+        'disputed': 'false',
+        'needs-review': 'mixed'
+      }
+      
       const factCheckData = {
-        verdict,
+        verdict: verdictMapping[verdict] || verdict,
         confidence: confidenceLevel,
         evidence,
         sources: sources.filter(s => s.trim()),
@@ -326,7 +333,7 @@ export const FactCheckModal = ({ isOpen, onClose, article }) => {
                 : 'text-gray-600 hover:text-gray-800'
             }`}
           >
-            Peer Reviews (12)
+            Peer Reviews ({peerReviews.length})
           </button>
           <button
             onClick={() => setActiveTab('evidence')}
