@@ -173,6 +173,7 @@ export const FactCheckModal = ({ isOpen, onClose, article }) => {
   const [flaggedConcerns, setFlaggedConcerns] = useState([])
   const [peerReviews, setPeerReviews] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isVoting, setIsVoting] = useState(false)
   
   // Extract articleId from article prop
   const articleId = article?._id || article?.id
@@ -185,6 +186,7 @@ export const FactCheckModal = ({ isOpen, onClose, article }) => {
       
       // Convert fact checks to peer review format
       const reviews = factChecks.map(fc => ({
+        _id: fc._id,
         id: fc._id,
         reviewer: fc.reviewerUsername,
         reputation: fc.reviewer?.reputation || 0,
@@ -196,7 +198,8 @@ export const FactCheckModal = ({ isOpen, onClose, article }) => {
         submittedAt: fc.createdAt,
         votes: { up: fc.upvotes || 0, down: fc.downvotes || 0 },
         badges: fc.reviewer?.badges || [],
-        level: fc.reviewer?.level || 'Member'
+        level: fc.reviewer?.level || 'Member',
+        currentUserVote: fc.currentUserVote // Track user's vote
       }))
       
       setPeerReviews(reviews)
@@ -285,6 +288,25 @@ export const FactCheckModal = ({ isOpen, onClose, article }) => {
       setIsSubmitting(false)
       // Show error to user
       alert('Failed to submit fact check. Please try again.')
+    }
+  }
+
+  const handleFactCheckVote = async (factCheckId, voteType) => {
+    if (isVoting) return
+
+    try {
+      setIsVoting(true)
+      // Convert 'up'/'down' to 'upvote'/'downvote' for backend
+      const backendVoteType = voteType === 'up' ? 'upvote' : 'downvote'
+      await factChecksAPI.voteOnFactCheck(factCheckId, backendVoteType)
+      
+      // Update the peer reviews with the new vote
+      await loadPeerReviews()
+    } catch (error) {
+      console.error('Failed to vote on fact check:', error)
+      alert('Failed to vote. Please try again.')
+    } finally {
+      setIsVoting(false)
     }
   }
 
@@ -563,19 +585,19 @@ export const FactCheckModal = ({ isOpen, onClose, article }) => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
                   <div>
                     <div className="text-2xl font-bold text-green-600">
-                      {peerReviews.filter(r => r.verdict === 'verified').length}
+                      {peerReviews.filter(r => r.verdict === 'true' || r.verdict === 'mostly-true').length}
                     </div>
                     <div className="text-sm text-gray-600">Verified</div>
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-red-600">
-                      {peerReviews.filter(r => r.verdict === 'disputed').length}
+                      {peerReviews.filter(r => r.verdict === 'false' || r.verdict === 'mostly-false').length}
                     </div>
                     <div className="text-sm text-gray-600">Disputed</div>
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-yellow-600">
-                      {peerReviews.filter(r => r.verdict === 'needs_review').length}
+                      {peerReviews.filter(r => r.verdict === 'mixed' || r.verdict === 'unsubstantiated').length}
                     </div>
                     <div className="text-sm text-gray-600">Needs Review</div>
                   </div>
@@ -621,19 +643,19 @@ export const FactCheckModal = ({ isOpen, onClose, article }) => {
                       </div>
                       
                       <div className="flex items-center space-x-2">
-                        {review.verdict === 'verified' && (
+                        {(review.verdict === 'true' || review.verdict === 'mostly-true') && (
                           <>
                             <CheckCircle className="w-5 h-5 text-green-600" />
                             <span className="text-sm font-medium text-green-600">Verified</span>
                           </>
                         )}
-                        {review.verdict === 'disputed' && (
+                        {(review.verdict === 'false' || review.verdict === 'mostly-false') && (
                           <>
                             <AlertTriangle className="w-5 h-5 text-red-600" />
                             <span className="text-sm font-medium text-red-600">Disputed</span>
                           </>
                         )}
-                        {review.verdict === 'needs-review' && (
+                        {(review.verdict === 'mixed' || review.verdict === 'unsubstantiated') && (
                           <>
                             <Clock className="w-5 h-5 text-yellow-600" />
                             <span className="text-sm font-medium text-yellow-600">Needs Review</span>
@@ -690,16 +712,29 @@ export const FactCheckModal = ({ isOpen, onClose, article }) => {
                         {new Date(review.submittedAt).toLocaleString()}
                       </div>
                       <div className="flex items-center space-x-4">
-                        <button className="flex items-center space-x-1 text-green-600 hover:text-green-700 transition-colors">
+                        <button 
+                          className={`flex items-center space-x-1 transition-colors ${
+                            review.currentUserVote === 'up' 
+                              ? 'text-blue-600' 
+                              : 'text-gray-600 hover:text-blue-600'
+                          }`}
+                          onClick={() => handleFactCheckVote(review._id, 'up')}
+                          disabled={isVoting}
+                        >
                           <ThumbsUp className="w-4 h-4" />
-                          <span>{review.votes.up}</span>
+                          <span>{review.votes?.up || 0}</span>
                         </button>
-                        <button className="flex items-center space-x-1 text-red-600 hover:text-red-700 transition-colors">
+                        <button 
+                          className={`flex items-center space-x-1 transition-colors ${
+                            review.currentUserVote === 'down' 
+                              ? 'text-red-600' 
+                              : 'text-gray-600 hover:text-red-600'
+                          }`}
+                          onClick={() => handleFactCheckVote(review._id, 'down')}
+                          disabled={isVoting}
+                        >
                           <ThumbsDown className="w-4 h-4" />
-                          <span>{review.votes.down}</span>
-                        </button>
-                        <button className="text-gray-600 hover:text-gray-700 transition-colors">
-                          <MessageSquare className="w-4 h-4" />
+                          <span>{review.votes?.down || 0}</span>
                         </button>
                       </div>
                     </div>

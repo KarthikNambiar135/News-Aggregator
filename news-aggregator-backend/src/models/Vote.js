@@ -4,7 +4,7 @@ const voteSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     targetId: { type: mongoose.Schema.Types.ObjectId, required: true },
-    targetType: { type: String, enum: ["article", "annotation"], required: true },
+    targetType: { type: String, enum: ["article", "annotation", "factcheck"], required: true },
     type: { type: String, enum: ["upvote", "downvote", "credible", "not-credible"], required: true },
   },
   { timestamps: true }

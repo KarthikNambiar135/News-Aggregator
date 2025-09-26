@@ -1,6 +1,7 @@
 const FactCheck = require('../models/FactCheck');
 const Article = require('../models/Article');
 const User = require('../models/User');
+const Vote = require('../models/Vote');
 const Notification = require('../models/Notification');
 const { checkAchievements } = require('../utils/achievements');
 
@@ -152,10 +153,32 @@ exports.getFactChecksForArticle = async (req, res) => {
   try {
     const { articleId } = req.params;
     const { sortBy = 'netVotes', order = 'desc' } = req.query;
+    const userId = req.user?._id; // Optional - user might not be logged in
 
     const factChecks = await FactCheck.find({ articleId })
       .populate('reviewer', 'name username role reputation badges level expertise')
       .sort({ [sortBy]: order === 'desc' ? -1 : 1, createdAt: -1 });
+
+    // Get user votes if logged in
+    let userVotes = {};
+    if (userId) {
+      const votes = await Vote.find({
+        userId,
+        targetId: { $in: factChecks.map(fc => fc._id) },
+        targetType: 'factcheck'
+      });
+      userVotes = votes.reduce((acc, vote) => {
+        acc[vote.targetId.toString()] = vote.type === 'upvote' ? 'up' : 'down';
+        return acc;
+      }, {});
+    }
+
+    // Add user vote info to fact checks
+    const factChecksWithVotes = factChecks.map(fc => {
+      const factCheckObj = fc.toObject();
+      factCheckObj.currentUserVote = userVotes[fc._id.toString()] || null;
+      return factCheckObj;
+    });
 
     // Calculate statistics
     const stats = {
@@ -173,7 +196,7 @@ exports.getFactChecksForArticle = async (req, res) => {
     };
 
     res.json({
-      factChecks,
+      factChecks: factChecksWithVotes,
       stats
     });
   } catch (error) {
@@ -186,6 +209,7 @@ exports.voteOnFactCheck = async (req, res) => {
   try {
     const { factCheckId } = req.params;
     const { voteType } = req.body; // 'upvote' or 'downvote'
+    const userId = req.user._id;
 
     if (!['upvote', 'downvote'].includes(voteType)) {
       return res.status(400).json({ message: 'Invalid vote type' });
@@ -196,21 +220,71 @@ exports.voteOnFactCheck = async (req, res) => {
       return res.status(404).json({ message: 'Fact-check not found' });
     }
 
-    // Simplified voting - in production, use Vote model to prevent duplicate votes
-    const updateField = voteType === 'upvote' ? 'upvotes' : 'downvotes';
-    
-    await FactCheck.findByIdAndUpdate(factCheckId, {
-      $inc: { [updateField]: 1 }
+    // Check if user has already voted
+    const existingVote = await Vote.findOne({
+      userId,
+      targetId: factCheckId,
+      targetType: 'factcheck'
     });
 
+    let voteChange = 0;
+    let reputationChange = 0;
+
+    if (existingVote) {
+      // User is changing their vote or removing it
+      if (existingVote.type === voteType) {
+        // Same vote type - remove vote
+        await Vote.findByIdAndDelete(existingVote._id);
+        voteChange = voteType === 'upvote' ? -1 : -1;
+        reputationChange = voteType === 'upvote' ? -2 : 1;
+      } else {
+        // Different vote type - change vote
+        await Vote.findByIdAndUpdate(existingVote._id, { type: voteType });
+        voteChange = voteType === 'upvote' ? 2 : -2; // +1 for new, -1 for old
+        reputationChange = voteType === 'upvote' ? 3 : -3; // +2 for new, -1 for old (or vice versa)
+      }
+    } else {
+      // New vote
+      await Vote.create({
+        userId,
+        targetId: factCheckId,
+        targetType: 'factcheck',
+        type: voteType
+      });
+      voteChange = 1;
+      reputationChange = voteType === 'upvote' ? 2 : -1;
+    }
+
+    // Update fact-check vote counts
+    if (existingVote && existingVote.type !== voteType) {
+      // Changing vote type (upvote to downvote or vice versa)
+      const newField = voteType === 'upvote' ? 'upvotes' : 'downvotes';
+      const oldField = voteType === 'upvote' ? 'downvotes' : 'upvotes';
+      await FactCheck.findByIdAndUpdate(factCheckId, {
+        $inc: { 
+          [newField]: 1,
+          [oldField]: -1
+        }
+      });
+    } else {
+      // New vote or removing same vote
+      const updateField = voteType === 'upvote' ? 'upvotes' : 'downvotes';
+      await FactCheck.findByIdAndUpdate(factCheckId, {
+        $inc: { [updateField]: voteChange }
+      });
+    }
+
     // Update reviewer reputation
-    const reputationChange = voteType === 'upvote' ? 2 : -1;
     await User.findByIdAndUpdate(factCheck.reviewer, {
       $inc: { reputation: reputationChange }
     });
 
+    // Recalculate article credibility score after voting
+    await updateArticleCredibilityScore(factCheck.articleId);
+
     res.json({ message: 'Vote recorded successfully' });
   } catch (error) {
+    console.error('Vote error:', error);
     res.status(500).json({ message: error.message });
   }
 };
