@@ -137,15 +137,17 @@ const Dashboard = () => {
 
   const handleVote = async (articleId, voteType) => {
     try {
-      await articlesAPI.voteArticle(articleId, voteType)
-      // Refresh articles to show updated vote counts
-      loadArticles()
+      const response = await articlesAPI.voteArticle(articleId, voteType)
+      
+      // Return the vote data for local state updates
+      return response.data
     } catch (error) {
       console.error('Failed to vote:', error)
       setToast({
         message: 'Failed to vote. Please try again.',
         type: 'error'
       })
+      throw error
     }
   }
 

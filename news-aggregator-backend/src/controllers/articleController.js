@@ -258,8 +258,34 @@ exports.getArticles = async (req, res) => {
       Article.countDocuments(filter)
     ]);
 
+    // If user is authenticated, get their votes for these articles
+    let articlesWithVotes = articles;
+    if (req.user) {
+      const Vote = require('../models/Vote');
+      const articleIds = articles.map(article => article._id);
+      
+      const userVotes = await Vote.find({
+        userId: req.user._id,
+        targetId: { $in: articleIds },
+        targetType: 'article'
+      });
+
+      // Create a map of article ID to vote type for quick lookup
+      const voteMap = {};
+      userVotes.forEach(vote => {
+        voteMap[vote.targetId.toString()] = vote.type;
+      });
+
+      // Add user vote info to each article
+      articlesWithVotes = articles.map(article => {
+        const articleObj = article.toObject();
+        articleObj.userVote = voteMap[article._id.toString()] || null;
+        return articleObj;
+      });
+    }
+
     res.json({
-      articles,
+      articles: articlesWithVotes,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -293,13 +319,25 @@ exports.getArticleById = async (req, res) => {
       .populate('reviewer', 'name username role reputation badges level')
       .sort({ netVotes: -1, createdAt: -1 });
 
+    // Get user's vote if authenticated
+    let articleWithVote = article.toObject();
+    if (req.user) {
+      const Vote = require('../models/Vote');
+      const userVote = await Vote.findOne({
+        userId: req.user._id,
+        targetId: req.params.id,
+        targetType: 'article'
+      });
+      articleWithVote.userVote = userVote ? userVote.type : null;
+    }
+
     // Increment view count
     await Article.findByIdAndUpdate(req.params.id, {
       $inc: { viewCount: 1 }
     });
 
     res.json({
-      article,
+      article: articleWithVote,
       factChecks
     });
   } catch (error) {
@@ -366,25 +404,92 @@ exports.voteArticle = async (req, res) => {
       return res.status(404).json({ message: 'Article not found' });
     }
 
-    // Check if user already voted (simplified - in production use Vote model)
-    // For now, just increment/decrement
-    const updateField = voteType === 'upvote' ? 'upvotes' : 'downvotes';
+    // Don't allow voting on own articles
+    if (article.submittedBy.toString() === req.user._id.toString()) {
+      return res.status(403).json({ message: 'You cannot vote on your own article' });
+    }
+
+    const Vote = require('../models/Vote');
     
-    await Article.findByIdAndUpdate(id, {
-      $inc: { 
-        [updateField]: 1,
-        totalVotes: 1
-      }
+    // Check if user has already voted on this article
+    const existingVote = await Vote.findOne({
+      userId: req.user._id,
+      targetId: id,
+      targetType: 'article'
     });
+
+    let voteAction = 'added';
+    let upvoteChange = 0;
+    let downvoteChange = 0;
+    let userVote = voteType;
+
+    if (existingVote) {
+      if (existingVote.type === voteType) {
+        // Same vote type - remove the vote (toggle off)
+        await Vote.deleteOne({ _id: existingVote._id });
+        voteAction = 'removed';
+        userVote = null;
+        
+        // Decrement the count
+        if (voteType === 'upvote') {
+          upvoteChange = -1;
+        } else {
+          downvoteChange = -1;
+        }
+      } else {
+        // Different vote type - switch the vote
+        await Vote.findByIdAndUpdate(existingVote._id, { type: voteType });
+        voteAction = 'switched';
+        
+        // Switch counts
+        if (voteType === 'upvote') {
+          upvoteChange = 1;
+          downvoteChange = -1;
+        } else {
+          upvoteChange = -1;
+          downvoteChange = 1;
+        }
+      }
+    } else {
+      // New vote
+      await Vote.create({
+        userId: req.user._id,
+        targetId: id,
+        targetType: 'article',
+        type: voteType
+      });
+      
+      // Increment the count
+      if (voteType === 'upvote') {
+        upvoteChange = 1;
+      } else {
+        downvoteChange = 1;
+      }
+    }
+
+    // Update article vote counts
+    const updatedArticle = await Article.findByIdAndUpdate(id, {
+      $inc: { 
+        upvotes: upvoteChange,
+        downvotes: downvoteChange,
+        totalVotes: upvoteChange + downvoteChange
+      }
+    }, { new: true });
 
     // Update user activity
     await User.findByIdAndUpdate(req.user._id, {
-      $inc: { totalVotes: 1 },
       lastActiveAt: new Date()
     });
 
-    res.json({ message: 'Vote recorded successfully' });
+    res.json({ 
+      message: `Vote ${voteAction} successfully`,
+      userVote: userVote,
+      upvotes: updatedArticle.upvotes,
+      downvotes: updatedArticle.downvotes,
+      totalVotes: updatedArticle.totalVotes
+    });
   } catch (error) {
+    console.error('Vote error:', error);
     res.status(500).json({ message: error.message });
   }
 };
