@@ -213,7 +213,11 @@ exports.voteDiscussion = async (req, res) => {
 
     // Don't allow voting on own content
     if (!isReply && discussion.author.toString() === req.user._id.toString()) {
-      return res.status(403).json({ message: "You can't vote on your own discussion" });
+      console.log(`User ${req.user._id} tried to vote on their own discussion ${id}`);
+      return res.status(403).json({ 
+        message: "You can't vote on your own discussion",
+        isOwnContent: true
+      });
     }
 
     if (isReply) {
@@ -222,7 +226,11 @@ exports.voteDiscussion = async (req, res) => {
         return res.status(404).json({ message: 'Reply not found' });
       }
       if (reply.userId.toString() === req.user._id.toString()) {
-        return res.status(403).json({ message: "You can't vote on your own reply" });
+        console.log(`User ${req.user._id} tried to vote on their own reply ${replyId}`);
+        return res.status(403).json({ 
+          message: "You can't vote on your own reply",
+          isOwnContent: true
+        });
       }
     }
 

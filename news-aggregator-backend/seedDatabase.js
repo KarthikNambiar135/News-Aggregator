@@ -6,6 +6,7 @@ const Article = require('./src/models/Article');
 const Source = require('./src/models/Source');
 const FactCheck = require('./src/models/FactCheck');
 const Notification = require('./src/models/Notification');
+const Discussion = require('./src/models/Discussion');
 
 const connectDB = async () => {
   try {
@@ -19,74 +20,26 @@ const connectDB = async () => {
 
 const seedData = async () => {
   try {
-    // Clear existing data
+    // Clear existing data (but keep existing users!)
     console.log('🧹 Clearing existing data...');
     await Promise.all([
-      User.deleteMany({}),
       Article.deleteMany({}),
       Source.deleteMany({}),
       FactCheck.deleteMany({}),
-      Notification.deleteMany({})
+      Notification.deleteMany({}),
+      Discussion.deleteMany({})
     ]);
 
-    // Create sample users
-    console.log('👥 Creating sample users...');
-    const users = await User.create([
-      {
-        name: 'Demo User',
-        username: '123',
-        email: 'demo@truthhub.com',
-        password: '123456',
-        reputation: 85,
-        articlesVerified: 23,
-        badges: ['Demo User', 'Active'],
-        level: 'Advanced',
-        specialties: ['Technology', 'Science'],
-        bio: 'Demo user for testing TruthHub features',
-        accuracyRate: 92
-      },
-      {
-        name: 'Dr. Climate Expert',
-        username: 'DrClimateExpert',
-        email: 'climate@example.com',
-        password: 'password123',
-        reputation: 2847,
-        articlesVerified: 342,
-        badges: ['Expert', 'Trusted', 'Top Contributor'],
-        level: 'Expert',
-        specialties: ['Science', 'Environment'],
-        bio: 'Climate scientist with 15 years of research experience',
-        accuracyRate: 96
-      },
-      {
-        name: 'News Validator',
-        username: 'NewsValidator',
-        email: 'validator@example.com',
-        password: 'password123',
-        reputation: 2156,
-        articlesVerified: 278,
-        badges: ['Trusted', 'Active'],
-        level: 'Expert',
-        specialties: ['Politics', 'Economy'],
-        bio: 'Experienced journalist and fact-checker',
-        accuracyRate: 94
-      },
-      {
-        name: 'Truth Seeker',
-        username: 'TruthSeeker99',
-        email: 'seeker@example.com',
-        password: 'password123',
-        reputation: 1834,
-        articlesVerified: 201,
-        badges: ['Rising Star', 'Active'],
-        level: 'Advanced',
-        specialties: ['Technology', 'Environment'],
-        bio: 'Passionate about fighting misinformation',
-        accuracyRate: 92
-      }
-    ]);
+    // Get existing users to reference in discussions
+    console.log('👥 Getting existing users...');
+    const users = await User.find({}).limit(10);
+    
+    if (users.length === 0) {
+      console.log('⚠️ No existing users found. Please register some users first.');
+      return;
+    }
 
-    console.log(`✅ Created ${users.length} users`);
+    console.log(`✅ Found ${users.length} existing users`);
 
     // Create sample sources
     console.log('📰 Creating sample sources...');
@@ -219,6 +172,91 @@ const seedData = async () => {
     ]);
 
     console.log(`✅ Created ${articles.length} articles`);
+
+    // Create sample discussions
+    console.log('💬 Creating sample discussions...');
+    const discussions = await Discussion.create([
+      {
+        title: 'How do we combat misinformation on social media?',
+        content: 'With the rise of social media platforms, misinformation spreads faster than ever. What are the most effective strategies fact-checkers should use to counter false narratives?',
+        author: users[1]._id,
+        category: 'general',
+        tags: ['misinformation', 'social-media', 'strategy'],
+        upvotes: 12,
+        downvotes: 2,
+        totalVotes: 10,
+        viewCount: 156,
+        replies: [
+          {
+            userId: users[2]._id,
+            content: 'I think the key is speed. We need to fact-check claims within hours, not days. By the time we respond, the false information has already spread.',
+            upvotes: 8,
+            downvotes: 1,
+            totalVotes: 7
+          },
+          {
+            userId: users[3]._id,
+            content: 'Education is more important than speed. We should focus on teaching people how to identify unreliable sources.',
+            upvotes: 6,
+            downvotes: 0,
+            totalVotes: 6
+          }
+        ]
+      },
+      {
+        title: 'Best tools for fact-checking in 2024',
+        content: 'What are your go-to tools and resources for fact-checking? I\'m looking to expand my toolkit and would love recommendations from experienced fact-checkers.',
+        author: users[3]._id,
+        category: 'general',
+        tags: ['tools', 'resources', 'fact-checking'],
+        upvotes: 18,
+        downvotes: 0,
+        totalVotes: 18,
+        viewCount: 243,
+        replies: [
+          {
+            userId: users[0]._id,
+            content: 'I highly recommend using reverse image search tools like TinEye and Google Images for visual verification.',
+            upvotes: 15,
+            downvotes: 0,
+            totalVotes: 15
+          }
+        ]
+      },
+      {
+        title: 'Climate change fact-checking: Common misconceptions',
+        content: 'As someone who frequently fact-checks climate-related claims, I\'ve noticed certain misconceptions keep appearing. Let\'s discuss the most persistent myths and how to address them effectively.',
+        author: users[1]._id,
+        category: 'science',
+        tags: ['climate-change', 'science', 'misconceptions'],
+        upvotes: 25,
+        downvotes: 3,
+        totalVotes: 22,
+        viewCount: 312
+      },
+      {
+        title: 'Verifying political statements during election season',
+        content: 'Election season brings a flood of political claims that need verification. What\'s the best approach for maintaining objectivity while fact-checking political statements?',
+        author: users[2]._id,
+        category: 'politics',
+        tags: ['politics', 'elections', 'objectivity'],
+        upvotes: 14,
+        downvotes: 5,
+        totalVotes: 9,
+        viewCount: 198,
+        replies: [
+          {
+            userId: users[1]._id,
+            content: 'Always cite primary sources and avoid opinion-based language. Stick to verifiable facts only.',
+            upvotes: 10,
+            downvotes: 1,
+            totalVotes: 9
+          }
+        ]
+      }
+    ]);
+
+    console.log(`✅ Created ${discussions.length} discussions`);
 
     // Create sample fact-checks
     console.log('🔍 Creating sample fact-checks...');
