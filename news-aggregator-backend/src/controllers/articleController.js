@@ -481,6 +481,29 @@ exports.voteArticle = async (req, res) => {
       lastActiveAt: new Date()
     });
 
+    // Create notification for upvotes (not downvotes)
+    if (voteType === 'upvote' && voteAction === 'added') {
+      try {
+        const Notification = require('../models/Notification');
+        await Notification.create({
+          userId: article.submittedBy,
+          type: 'article_upvoted',
+          title: 'Article Upvoted',
+          message: `${req.user.username} upvoted your article "${article.title}"`,
+          actionUrl: `/article/${article._id}`,
+          actionable: true,
+          metadata: {
+            articleId: article._id,
+            voterId: req.user._id,
+            voteType: 'upvote'
+          }
+        });
+      } catch (notifError) {
+        console.error('Failed to create upvote notification:', notifError);
+        // Don't fail the vote if notification fails
+      }
+    }
+
     res.json({ 
       message: `Vote ${voteAction} successfully`,
       userVote: userVote,

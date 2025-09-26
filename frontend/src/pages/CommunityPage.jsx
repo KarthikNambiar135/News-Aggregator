@@ -1,127 +1,87 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 import { 
-  User, Star, Award, TrendingUp, MessageSquare, Shield, 
-  Calendar, CheckCircle, AlertTriangle, Clock, Trophy,
-  Users, BookOpen, Search, Filter
+  MessageSquare, 
+  ThumbsUp, 
+  Users, 
+  Trophy, 
+  Plus,
+  Search,
+  Shield,
+  BookOpen,
+  CheckCircle,
+  AlertCircle,
+  Info
 } from 'lucide-react'
-import { authAPI } from '../utils/api'
+import { discussionsAPI, authAPI } from '../utils/api'
 
 const CommunityPage = () => {
-  const [activeTab, setActiveTab] = useState('leaderboard')
-  const [searchQuery, setSearchQuery] = useState('')
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  
+  // State management
+  const [activeTab, setActiveTab] = useState('discussions')
+  const [discussions, setDiscussions] = useState([])
   const [leaderboard, setLeaderboard] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
+  // Load data when tab changes
   useEffect(() => {
-    const loadLeaderboard = async () => {
-      try {
-        setLoading(true)
-        const response = await authAPI.getLeaderboard({ limit: 20, sortBy: 'reputation' })
-        setLeaderboard(response.data)
-      } catch (error) {
-        console.error('Failed to load leaderboard:', error)
-        // Fallback to mock data
-        setLeaderboard(topFactCheckers)
-      } finally {
-        setLoading(false)
+    if (activeTab === 'discussions') {
+      loadDiscussions()
+    } else if (activeTab === 'leaderboard') {
+      loadLeaderboard()
+    }
+  }, [activeTab, searchQuery])
+
+  const loadDiscussions = async () => {
+    try {
+      setLoading(true)
+      const params = {
+        page: 1,
+        limit: 20,
+        sortBy: 'createdAt',
+        search: searchQuery || undefined
       }
+      const response = await discussionsAPI.getDiscussions(params)
+      setDiscussions(response.data.discussions || [])
+    } catch (error) {
+      console.error('Failed to load discussions:', error)
+      setDiscussions([])
+    } finally {
+      setLoading(false)
     }
-
-    loadLeaderboard()
-  }, [])
-
-  const topFactCheckers = [
-    {
-      id: 1,
-      username: 'DrFactChecker',
-      reputation: 2847,
-      verificationsCount: 342,
-      accuracy: 96,
-      specialties: ['Science', 'Health'],
-      joinDate: '2024-03-15',
-      badges: ['Expert', 'Trusted', 'Top Contributor'],
-      level: 'Expert'
-    },
-    {
-      id: 2,
-      username: 'NewsValidator',
-      reputation: 2156,
-      verificationsCount: 278,
-      accuracy: 94,
-      specialties: ['Politics', 'Economy'],
-      joinDate: '2024-02-20',
-      badges: ['Trusted', 'Active'],
-      level: 'Expert'
-    },
-    {
-      id: 3,
-      username: 'TruthSeeker99',
-      reputation: 1834,
-      verificationsCount: 201,
-      accuracy: 92,
-      specialties: ['Technology', 'Environment'],
-      joinDate: '2024-04-10',
-      badges: ['Rising Star', 'Active'],
-      level: 'Advanced'
-    }
-  ]
-
-  const recentDiscussions = [
-    {
-      id: 1,
-      title: 'Best practices for verifying climate data sources',
-      author: 'ClimateExpert',
-      replies: 23,
-      lastActivity: '2 hours ago',
-      category: 'Methodology',
-      tags: ['Climate', 'Data Verification']
-    },
-    {
-      id: 2,
-      title: 'How to handle conflicting expert opinions?',
-      author: 'NewFactChecker',
-      replies: 15,
-      lastActivity: '4 hours ago',
-      category: 'Discussion',
-      tags: ['Guidelines', 'Conflict Resolution']
-    },
-    {
-      id: 3,
-      title: 'Proposed changes to credibility scoring algorithm',
-      author: 'TechModerator',
-      replies: 41,
-      lastActivity: '6 hours ago',
-      category: 'Platform Updates',
-      tags: ['Algorithm', 'Scoring']
-    }
-  ]
-
-  const communityStats = [
-    { label: 'Active Fact-Checkers', value: '2,847', icon: Users, color: 'blue' },
-    { label: 'Articles Verified', value: '15,632', icon: CheckCircle, color: 'green' },
-    { label: 'Community Discussions', value: '1,247', icon: MessageSquare, color: 'purple' },
-    { label: 'Expert Contributors', value: '158', icon: Award, color: 'orange' }
-  ]
-
-  const getBadgeColor = (badge) => {
-    const colors = {
-      'Expert': 'bg-purple-100 text-purple-800',
-      'Trusted': 'bg-blue-100 text-blue-800',
-      'Top Contributor': 'bg-green-100 text-green-800',
-      'Rising Star': 'bg-yellow-100 text-yellow-800',
-      'Active': 'bg-gray-100 text-gray-800'
-    }
-    return colors[badge] || 'bg-gray-100 text-gray-800'
   }
 
-  const getLevelColor = (level) => {
-    const colors = {
-      'Expert': 'text-purple-600 bg-purple-100',
-      'Advanced': 'text-blue-600 bg-blue-100',
-      'Intermediate': 'text-green-600 bg-green-100',
-      'Beginner': 'text-gray-600 bg-gray-100'
+  const loadLeaderboard = async () => {
+    try {
+      setLoading(true)
+      const response = await authAPI.getLeaderboard({ limit: 20, sortBy: 'reputation' })
+      setLeaderboard(response.data || [])
+    } catch (error) {
+      console.error('Failed to load leaderboard:', error)
+      setLeaderboard([])
+    } finally {
+      setLoading(false)
     }
-    return colors[level] || 'text-gray-600 bg-gray-100'
+  }
+
+  const handleCreateDiscussion = async (discussionData) => {
+    try {
+      const response = await discussionsAPI.createDiscussion(discussionData)
+      setDiscussions(prev => [response.data.discussion, ...prev])
+      setShowCreateModal(false)
+    } catch (error) {
+      console.error('Failed to create discussion:', error)
+      alert('Failed to create discussion. Please try again.')
+    }
+  }
+
+  const handleDiscussionClick = (discussion) => {
+    navigate(`/discussion/${discussion._id}`)
   }
 
   return (
@@ -129,298 +89,442 @@ const CommunityPage = () => {
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="text-center animate-fade-in-up">
+          <div className="text-center">
             <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              <span className="green-highlight animate-scale-in">Community</span> Hub
+              <span className="text-green-600">Community</span> Hub
             </h1>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-              Connect with fellow fact-checkers, share expertise, and build a more trustworthy news ecosystem together.
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Connect with fellow fact-checkers, share expertise, and build a more trustworthy news ecosystem.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Community Stats */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          {communityStats.map((stat, index) => {
-            const IconComponent = stat.icon
-            return (
-              <div 
-                key={index} 
-                className="bg-white rounded-xl p-6 card-shadow hover-lift smooth-transition animate-fade-in-up opacity-0"
-                style={{ 
-                  animationDelay: `${0.3 + index * 0.1}s`, 
-                  animationFillMode: 'forwards' 
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-2xl font-bold text-gray-900 pulse-glow">{stat.value}</div>
-                    <div className="text-gray-600">{stat.label}</div>
-                  </div>
-                  <div className={`w-12 h-12 bg-${stat.color}-100 rounded-lg flex items-center justify-center glow-effect`}>
-                    <IconComponent className={`w-6 h-6 text-${stat.color}-600`} />
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Navigation Tabs */}
-        <div className="bg-white rounded-xl card-shadow mb-8 animate-fade-in-up" style={{ animationDelay: '0.7s' }}>
-          <div className="border-b">
-            <nav className="flex space-x-8 px-6">
-              <button
-                onClick={() => setActiveTab('leaderboard')}
-                className={`py-4 px-2 border-b-2 font-medium text-sm smooth-transition hover-lift button-press ${
-                  activeTab === 'leaderboard'
-                    ? 'border-dark-green text-dark-green glow-effect'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center space-x-2">
-                  <Trophy className="w-4 h-4" />
-                  <span>Leaderboard</span>
-                </div>
-              </button>
-
+      {/* Navigation Tabs */}
+      <div className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex justify-between items-center">
+            <div className="flex space-x-8">
               <button
                 onClick={() => setActiveTab('discussions')}
-                className={`py-4 px-2 border-b-2 font-medium text-sm smooth-transition hover-lift button-press ${
+                className={`py-4 px-2 border-b-2 font-medium text-sm ${
                   activeTab === 'discussions'
-                    ? 'border-dark-green text-dark-green glow-effect'
+                    ? 'border-green-500 text-green-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                <div className="flex items-center space-x-2">
-                  <MessageSquare className="w-4 h-4" />
-                  <span>Discussions</span>
-                </div>
+                <MessageSquare className="w-5 h-5 inline mr-2" />
+                Discussions
               </button>
-
+              <button
+                onClick={() => setActiveTab('leaderboard')}
+                className={`py-4 px-2 border-b-2 font-medium text-sm ${
+                  activeTab === 'leaderboard'
+                    ? 'border-green-500 text-green-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Trophy className="w-5 h-5 inline mr-2" />
+                Leaderboard
+              </button>
               <button
                 onClick={() => setActiveTab('guidelines')}
-                className={`py-4 px-2 border-b-2 font-medium text-sm smooth-transition hover-lift button-press ${
+                className={`py-4 px-2 border-b-2 font-medium text-sm ${
                   activeTab === 'guidelines'
-                    ? 'border-dark-green text-dark-green glow-effect'
+                    ? 'border-green-500 text-green-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                <div className="flex items-center space-x-2">
-                  <BookOpen className="w-4 h-4" />
-                  <span>Guidelines</span>
-                </div>
+                <BookOpen className="w-5 h-5 inline mr-2" />
+                Guidelines
               </button>
-            </nav>
-          </div>
+            </div>
 
-          {/* Tab Content */}
-          <div className="p-6">
-            {activeTab === 'leaderboard' && (
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">Top Fact-Checkers</h2>
-                  <div className="flex items-center space-x-4">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Search contributors..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-dark-green focus:border-dark-green outline-none"
-                      />
-                    </div>
-                    <select className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-dark-green focus:border-dark-green outline-none">
-                      <option>All Time</option>
-                      <option>This Month</option>
-                      <option>This Week</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  {loading ? (
-                    <div className="flex justify-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-dark-green"></div>
-                    </div>
-                  ) : (
-                    (leaderboard.length > 0 ? leaderboard : topFactCheckers).map((factChecker, index) => (
-                    <div key={factChecker.id} className="bg-gray-50 rounded-xl p-6 hover:bg-gray-100 transition-colors">
-                      <div className="flex items-center space-x-4">
-                        {/* Rank */}
-                        <div className="flex-shrink-0">
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${
-                            index === 0 ? 'bg-yellow-100 text-yellow-800' :
-                            index === 1 ? 'bg-gray-100 text-gray-800' :
-                            index === 2 ? 'bg-orange-100 text-orange-800' :
-                            'bg-blue-100 text-blue-800'
-                          }`}>
-                            {index + 1}
-                          </div>
-                        </div>
-
-                        {/* User Info */}
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-2">
-                            <h3 className="text-lg font-semibold text-gray-900">{factChecker.username}</h3>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getLevelColor(factChecker.level)}`}>
-                              {factChecker.level}
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center space-x-6 text-sm text-gray-600 mb-3">
-                            <div className="flex items-center space-x-1">
-                              <Star className="w-4 h-4" />
-                              <span>{factChecker.reputation} reputation</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <CheckCircle className="w-4 h-4" />
-                              <span>{factChecker.articlesVerified || factChecker.verificationsCount || 0} verifications</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <TrendingUp className="w-4 h-4" />
-                              <span>{factChecker.articlesSubmitted || 0} submissions</span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-between">
-                            <div className="flex flex-wrap gap-2">
-                              {(factChecker.badges || []).map((badge) => (
-                                <span key={badge} className={`px-2 py-1 rounded-full text-xs font-medium ${getBadgeColor(badge)}`}>
-                                  {badge}
-                                </span>
-                              ))}
-                            </div>
-                            
-                            <div className="text-sm text-gray-500">
-                              Specialties: {factChecker.specialties?.join(', ') || 'General'}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )))
-                }
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'discussions' && (
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">Community Discussions</h2>
-                  <button className="bg-dark-green text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition-colors">
-                    Start Discussion
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  {recentDiscussions.map((discussion) => (
-                    <div key={discussion.id} className="bg-gray-50 rounded-xl p-6 hover:bg-gray-100 transition-colors cursor-pointer">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-2">
-                            <span className="bg-secondary px-2 py-1 rounded-full text-xs font-medium text-dark-green">
-                              {discussion.category}
-                            </span>
-                            <h3 className="text-lg font-semibold text-gray-900 hover:text-dark-green">
-                              {discussion.title}
-                            </h3>
-                          </div>
-                          
-                          <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
-                            <div className="flex items-center space-x-1">
-                              <User className="w-4 h-4" />
-                              <span>by {discussion.author}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <MessageSquare className="w-4 h-4" />
-                              <span>{discussion.replies} replies</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Clock className="w-4 h-4" />
-                              <span>{discussion.lastActivity}</span>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap gap-2">
-                            {discussion.tags.map((tag) => (
-                              <span key={tag} className="bg-white px-2 py-1 rounded text-xs text-gray-600">
-                                #{tag}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'guidelines' && (
-              <div className="max-w-4xl">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Community Guidelines</h2>
-                
-                <div className="space-y-8">
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-                    <div className="flex items-center space-x-3 mb-4">
-                      <Shield className="w-6 h-6 text-blue-600" />
-                      <h3 className="text-lg font-semibold text-blue-900">Core Principles</h3>
-                    </div>
-                    <ul className="space-y-2 text-blue-800">
-                      <li>• Maintain objectivity and neutrality in all fact-checking activities</li>
-                      <li>• Base conclusions on verifiable evidence and credible sources</li>
-                      <li>• Respect different perspectives while prioritizing factual accuracy</li>
-                      <li>• Engage constructively with community members</li>
-                    </ul>
-                  </div>
-
-                  <div className="bg-green-50 border border-green-200 rounded-xl p-6">
-                    <div className="flex items-center space-x-3 mb-4">
-                      <CheckCircle className="w-6 h-6 text-green-600" />
-                      <h3 className="text-lg font-semibold text-green-900">Verification Standards</h3>
-                    </div>
-                    <ul className="space-y-2 text-green-800">
-                      <li>• Always provide multiple credible sources when possible</li>
-                      <li>• Clearly distinguish between facts, opinions, and interpretations</li>
-                      <li>• Acknowledge limitations and uncertainties in your analysis</li>
-                      <li>• Update or correct information when new evidence emerges</li>
-                    </ul>
-                  </div>
-
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
-                    <div className="flex items-center space-x-3 mb-4">
-                      <AlertTriangle className="w-6 h-6 text-yellow-600" />
-                      <h3 className="text-lg font-semibold text-yellow-900">Community Conduct</h3>
-                    </div>
-                    <ul className="space-y-2 text-yellow-800">
-                      <li>• Treat all community members with respect and professionalism</li>
-                      <li>• Focus on content and evidence, not personal attacks</li>
-                      <li>• Report suspicious or coordinated inauthentic behavior</li>
-                      <li>• Avoid conflicts of interest and disclose relevant affiliations</li>
-                    </ul>
-                  </div>
-
-                  <div className="bg-purple-50 border border-purple-200 rounded-xl p-6">
-                    <div className="flex items-center space-x-3 mb-4">
-                      <Award className="w-6 h-6 text-purple-600" />
-                      <h3 className="text-lg font-semibold text-purple-900">Recognition System</h3>
-                    </div>
-                    <ul className="space-y-2 text-purple-800">
-                      <li>• Reputation points are earned through quality contributions</li>
-                      <li>• Badges recognize expertise, activity, and community impact</li>
-                      <li>• Expert status requires demonstrated knowledge and accuracy</li>
-                      <li>• Community voting helps identify valuable contributors</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
+            {activeTab === 'discussions' && user && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                New Discussion
+              </button>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {activeTab === 'discussions' && (
+          <DiscussionsTab
+            discussions={discussions}
+            loading={loading}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onDiscussionClick={handleDiscussionClick}
+          />
+        )}
+
+        {activeTab === 'leaderboard' && (
+          <LeaderboardTab
+            leaderboard={leaderboard}
+            loading={loading}
+          />
+        )}
+
+        {activeTab === 'guidelines' && <GuidelinesTab />}
+      </div>
+
+      {/* Create Discussion Modal */}
+      {showCreateModal && (
+        <CreateDiscussionModal
+          onClose={() => setShowCreateModal(false)}
+          onSubmit={handleCreateDiscussion}
+        />
+      )}
+    </div>
+  )
+}
+
+// Discussions Tab Component
+const DiscussionsTab = ({ discussions, loading, searchQuery, onSearchChange, onDiscussionClick }) => {
+  return (
+    <div>
+      {/* Search Bar */}
+      <div className="mb-6">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search discussions..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+          />
+        </div>
+      </div>
+
+      {/* Discussions List */}
+      <div className="space-y-4">
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+          </div>
+        ) : discussions.length === 0 ? (
+          <div className="text-center py-12">
+            <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No discussions found</h3>
+            <p className="text-gray-500">Start a new discussion to get the conversation going!</p>
+          </div>
+        ) : (
+          discussions.map((discussion) => (
+            <DiscussionCard
+              key={discussion._id}
+              discussion={discussion}
+              onClick={() => onDiscussionClick(discussion)}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Discussion Card Component
+const DiscussionCard = ({ discussion, onClick }) => {
+  return (
+    <div 
+      className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+      onClick={onClick}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2 hover:text-green-600">
+            {discussion.title}
+          </h3>
+          
+          <p className="text-gray-600 mb-4 line-clamp-2">
+            {discussion.content.substring(0, 150)}...
+          </p>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4 text-sm text-gray-500">
+              <span>by {discussion.author?.username || 'Unknown'}</span>
+              <span>•</span>
+              <span>{new Date(discussion.createdAt).toLocaleDateString()}</span>
+              {discussion.category && (
+                <>
+                  <span>•</span>
+                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                    {discussion.category}
+                  </span>
+                </>
+              )}
+            </div>
+            
+            <div className="flex items-center space-x-4 text-sm text-gray-500">
+              <div className="flex items-center">
+                <ThumbsUp className="w-4 h-4 mr-1" />
+                <span>{discussion.upvotes || 0}</span>
+              </div>
+              <div className="flex items-center">
+                <MessageSquare className="w-4 h-4 mr-1" />
+                <span>{discussion.replies?.length || 0} replies</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Leaderboard Tab Component
+const LeaderboardTab = ({ leaderboard, loading }) => {
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">Community Leaderboard</h2>
+      
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+        </div>
+      ) : leaderboard.length === 0 ? (
+        <div className="text-center py-12">
+          <Trophy className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No leaderboard data</h3>
+          <p className="text-gray-500">Leaderboard will appear as users become active in the community.</p>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {leaderboard.map((user, index) => (
+            <LeaderboardCard key={user._id} user={user} rank={index + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Leaderboard Card Component
+const LeaderboardCard = ({ user, rank }) => {
+  const getRankColor = (rank) => {
+    if (rank === 1) return 'text-yellow-600 bg-yellow-50'
+    if (rank === 2) return 'text-gray-600 bg-gray-50'
+    if (rank === 3) return 'text-orange-600 bg-orange-50'
+    return 'text-gray-600 bg-gray-50'
+  }
+
+  const getRankIcon = (rank) => {
+    if (rank <= 3) return <Trophy className="w-5 h-5" />
+    return <span className="font-bold">{rank}</span>
+  }
+
+  return (
+    <div className="bg-white rounded-lg p-4 shadow-sm flex items-center justify-between">
+      <div className="flex items-center space-x-4">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${getRankColor(rank)}`}>
+          {getRankIcon(rank)}
+        </div>
+        
+        <div>
+          <h3 className="font-semibold text-gray-900">{user.username}</h3>
+          <p className="text-sm text-gray-500">Level {user.level || 'Beginner'}</p>
+        </div>
+      </div>
+      
+      <div className="flex items-center space-x-6 text-sm">
+        <div className="text-center">
+          <div className="font-semibold text-gray-900">{user.reputation || 0}</div>
+          <div className="text-gray-500">Reputation</div>
+        </div>
+        <div className="text-center">
+          <div className="font-semibold text-gray-900">{user.contributionsCount || 0}</div>
+          <div className="text-gray-500">Contributions</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Guidelines Tab Component
+const GuidelinesTab = () => {
+  return (
+    <div className="max-w-4xl">
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">Community Guidelines</h2>
+      
+      <div className="space-y-6">
+        {/* General Guidelines */}
+        <div className="bg-white rounded-lg p-6 shadow-sm">
+          <div className="flex items-center mb-4">
+            <Shield className="w-6 h-6 text-green-600 mr-3" />
+            <h3 className="text-xl font-semibold text-gray-900">General Guidelines</h3>
+          </div>
+          <div className="space-y-3 text-gray-700">
+            <p>• <strong>Be respectful:</strong> Treat all community members with respect and courtesy.</p>
+            <p>• <strong>Stay on topic:</strong> Keep discussions relevant to fact-checking and news analysis.</p>
+            <p>• <strong>No spam or self-promotion:</strong> Avoid excessive posting or promotional content.</p>
+            <p>• <strong>Use reliable sources:</strong> Always cite credible sources when making claims.</p>
+            <p>• <strong>Be constructive:</strong> Provide helpful feedback and constructive criticism.</p>
+          </div>
+        </div>
+
+        {/* Discussion Guidelines */}
+        <div className="bg-white rounded-lg p-6 shadow-sm">
+          <div className="flex items-center mb-4">
+            <MessageSquare className="w-6 h-6 text-blue-600 mr-3" />
+            <h3 className="text-xl font-semibold text-gray-900">Discussion Guidelines</h3>
+          </div>
+          <div className="space-y-3 text-gray-700">
+            <p>• <strong>Clear titles:</strong> Use descriptive titles that clearly explain your topic.</p>
+            <p>• <strong>Detailed content:</strong> Provide context and background information.</p>
+            <p>• <strong>Evidence-based:</strong> Support your points with evidence and sources.</p>
+            <p>• <strong>Acknowledge uncertainty:</strong> It's okay to express uncertainty or ask questions.</p>
+            <p>• <strong>Update when necessary:</strong> Edit your posts if new information becomes available.</p>
+          </div>
+        </div>
+
+        {/* Fact-Checking Standards */}
+        <div className="bg-white rounded-lg p-6 shadow-sm">
+          <div className="flex items-center mb-4">
+            <CheckCircle className="w-6 h-6 text-purple-600 mr-3" />
+            <h3 className="text-xl font-semibold text-gray-900">Fact-Checking Standards</h3>
+          </div>
+          <div className="space-y-3 text-gray-700">
+            <p>• <strong>Multiple sources:</strong> Cross-reference information with multiple credible sources.</p>
+            <p>• <strong>Primary sources:</strong> Prefer primary sources over secondary reporting when available.</p>
+            <p>• <strong>Context matters:</strong> Consider the full context, not just isolated statements.</p>
+            <p>• <strong>Transparency:</strong> Be transparent about your methodology and limitations.</p>
+            <p>• <strong>Bias awareness:</strong> Acknowledge and account for potential biases in sources.</p>
+          </div>
+        </div>
+
+        {/* Community Standards */}
+        <div className="bg-white rounded-lg p-6 shadow-sm">
+          <div className="flex items-center mb-4">
+            <AlertCircle className="w-6 h-6 text-red-600 mr-3" />
+            <h3 className="text-xl font-semibold text-gray-900">Prohibited Content</h3>
+          </div>
+          <div className="space-y-3 text-gray-700">
+            <p>• <strong>Harassment:</strong> Personal attacks, harassment, or threatening behavior.</p>
+            <p>• <strong>Misinformation:</strong> Deliberately spreading false or misleading information.</p>
+            <p>• <strong>Hate speech:</strong> Content that promotes hatred or discrimination.</p>
+            <p>• <strong>Illegal content:</strong> Content that violates applicable laws.</p>
+            <p>• <strong>Privacy violations:</strong> Sharing private information without consent.</p>
+          </div>
+        </div>
+
+        {/* Reporting */}
+        <div className="bg-white rounded-lg p-6 shadow-sm">
+          <div className="flex items-center mb-4">
+            <Info className="w-6 h-6 text-indigo-600 mr-3" />
+            <h3 className="text-xl font-semibold text-gray-900">Reporting Issues</h3>
+          </div>
+          <div className="space-y-3 text-gray-700">
+            <p>If you encounter content that violates these guidelines, please report it to the moderators.</p>
+            <p>We review all reports and take appropriate action to maintain a healthy community environment.</p>
+            <p>For urgent issues, you can contact the moderation team directly.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Create Discussion Modal Component
+const CreateDiscussionModal = ({ onClose, onSubmit }) => {
+  const [title, setTitle] = useState('')
+  const [content, setContent] = useState('')
+  const [category, setCategory] = useState('general')
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!title.trim() || !content.trim()) return
+
+    onSubmit({
+      title: title.trim(),
+      content: content.trim(),
+      category
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Start New Discussion</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              ×
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Title *
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="What would you like to discuss?"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Category
+              </label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+              >
+                <option value="general">General Discussion</option>
+                <option value="fact-checking">Fact Checking</option>
+                <option value="sources">Source Analysis</option>
+                <option value="methodology">Methodology</option>
+                <option value="tools">Tools & Resources</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Content *
+              </label>
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Share your thoughts, questions, or insights..."
+                className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+                rows="6"
+                required
+              />
+            </div>
+
+            <div className="flex space-x-3 pt-4">
+              <button
+                type="submit"
+                disabled={!title.trim() || !content.trim()}
+                className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
+              >
+                Create Discussion
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

@@ -5,6 +5,7 @@ import LandingPage from './pages/LandingPage'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
 import CommunityPage from './pages/CommunityPage'
+import DiscussionThread from './pages/DiscussionThread'
 import SmoothCursor from './components/SmoothCursor'
 
 // Protected Route component
@@ -43,6 +44,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <CommunityPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/discussion/:id" 
+            element={
+              <ProtectedRoute>
+                <DiscussionThread />
               </ProtectedRoute>
             } 
           />

@@ -45,6 +45,15 @@ body {
   .border-accent { border-color: var(--accent); }
   .border-dark-green { border-color: var(--dark-green); }
   
+  /* Hide scrollbar but keep scrolling */
+  .scrollbar-hide {
+    -ms-overflow-style: none;  /* Internet Explorer 10+ */
+    scrollbar-width: none;  /* Firefox */
+  }
+  .scrollbar-hide::-webkit-scrollbar { 
+    display: none;  /* Safari and Chrome */
+  }
+  
   /* Green highlight spans for text */
   .green-highlight { 
     background: linear-gradient(180deg, rgba(227, 234, 158, 0.6) 0%, rgba(227, 234, 158, 0.8) 100%);
