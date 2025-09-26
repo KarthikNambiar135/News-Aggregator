@@ -113,7 +113,9 @@ exports.submitArticle = async (req, res) => {
       sourceName: sourceName || source?.name || domain || 'Manual Submission',
       sourceDomain: domain,
       sourceReliability: source?.trustLevel || 'unknown',
-      author: parsed.author,
+      author: Array.isArray(parsed.author) ? 
+        (parsed.author.find(item => !item.startsWith('http')) || parsed.author[0] || '') : 
+        String(parsed.author || '').trim(),
       publishedAt: parsed.publishedAt,
       imageUrl: imageUrls.length > 0 ? imageUrls[0] : parsed.image,
       thumbnailUrl: imageUrls.length > 0 ? imageUrls[0] : parsed.image,
@@ -630,7 +632,9 @@ exports.analyzeUrl = async (req, res) => {
       title: parsed.title || '',
       subtitle: parsed.subtitle || '',
       description: parsed.summary || '',
-      author: parsed.author || '',
+      author: Array.isArray(parsed.author) ? 
+        (parsed.author.find(item => !item.startsWith('http')) || parsed.author[0] || '') : 
+        String(parsed.author || '').trim(),
       publishDate: parsed.publishedAt || new Date().toISOString(),
       domain,
       sourceReliability: source?.trustLevel || 'unknown',

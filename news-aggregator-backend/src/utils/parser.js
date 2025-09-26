@@ -17,8 +17,13 @@ const parseUrlContent = async (url) => {
       maxRedirects: 5
     });
 
-    // Extract using unfluff
+    // Extract using unfluff - suppress warnings temporarily
+    const originalWarn = console.warn;
+    console.warn = () => {}; // Temporarily disable warnings
+    
     const parsed = unfluff(html, url);
+    
+    console.warn = originalWarn; // Restore original console.warn
 
     // Extract date from HTML meta tags or parsed data
     let publishedAt = null;
@@ -58,14 +63,23 @@ const parseUrlContent = async (url) => {
       }
     }
 
-    // Extract author with better fallback
+    // Extract author with better fallback - ensure it's always a string
     let author = parsed.author;
+    
+    // If author is an array, extract the name part (not URL)
+    if (Array.isArray(author)) {
+      author = author.find(item => !item.startsWith('http')) || author[0] || '';
+    }
+    
     if (!author) {
       const authorMatch = html.match(/<meta[^>]*(?:property="article:author"|name="author")[^>]*content="([^"]+)"/i);
       if (authorMatch && authorMatch[1]) {
         author = authorMatch[1];
       }
     }
+    
+    // Ensure author is always a string
+    author = String(author || '').trim();
 
     // Extract subtitle/description
     let subtitle = parsed.description;
